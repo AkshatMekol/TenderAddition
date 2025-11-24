@@ -36,6 +36,19 @@ competitor_collection = db_past[COMPETITORS_COLLECTION]
 profile_collection = db[PROFILES_COLLECTION]
 score_collection = db[SCORE_COLLECTION]
 
+def parse_date_naive(date_str):
+    if not date_str or str(date_str).strip() == "":
+        return None
+    try:
+        dt = datetime.strptime(date_str, "%d-%b-%Y %I:%M %p")
+        return dt
+    except:
+        try:
+            dt = parser.parse(date_str)
+            return dt.replace(tzinfo=None)
+        except:
+            return None
+
 def query_deepseek(prompt, MODEL_NAME="deepseek-chat", retries=2, backoff=2):
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
     payload = {
