@@ -5,6 +5,7 @@ from datetime import datetime
 from pymongo import UpdateOne
 from config import STATE_URLS
 from helpers import collection 
+from config import JSONL_FILE
 
 def parse_iso_date(date_str):
     if not date_str or str(date_str).strip() == "":
@@ -76,7 +77,7 @@ def enrich_tender_data(tender):
 
     return enriched
 
-def upsertion(file_path, batch_size=500):
+def upsertion(file_path = JSONL_FILE, batch_size=500):
     batch_ops = []
     total_inserted = 0
     total_upserted = 0
