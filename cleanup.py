@@ -1,3 +1,8 @@
+from helpers import collection, vector_collection, s3
+from config import S3_BUCKET, S3_PREFIX
+from concurrent.futures import ThreadPoolExecutor
+from tqdm import tqdm
+
 def get_valid_tender_ids():
     valid_ids = [str(_id) for _id in collection.distinct("_id")]
     print(f"📊 Total distinct tender_ids in Mongo: {len(valid_ids)}\n")
