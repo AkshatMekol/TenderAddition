@@ -8,26 +8,26 @@ from scoring import submit_for_scoring
 
 if __name__ == "__main__":
 
-    print("\n===== STEP 1: Preprocessing JSONL & Mongo =====")
+    print("\n\n===== STEP 1: Preprocessing JSONL & Mongo =====")
     preprocessing()
 
-    print("\n===== STEP 2: Cleaning up S3 and Vectors =====")
+    print("\n\n===== STEP 2: Cleaning up S3 and Vectors =====")
     cleanup()
 
-    print("\n===== STEP 3: Upsert / Enrich Tenders =====")
+    print("\n\n===== STEP 3: Upsert / Enrich Tenders =====")
     upsertion()
 
-    print("\n===== STEP 4: Map Product Categories to Industries =====")
+    print("\n\n===== STEP 4: Map Product Categories to Industries =====")
     process_industries()
 
-    print("\n===== STEP 5: Enrich Tenders with City/State (Deepseek) =====")
+    print("\n\n===== STEP 5: Enrich Tenders with City/State (Deepseek) =====")
     process_locations()
 
-    print("\n===== STEP 6: Geocode Coordinates for Tenders =====")
+    print("\n\n===== STEP 6: Geocode Coordinates for Tenders =====")
     all_missing, existing_coords, to_geocode = prepare_locations()
     process_coordinates(all_missing, existing_coords, to_geocode)
 
-    print("\n===== STEP 7: Score Tenders for Company Profiles =====")
+    print("\n\n===== STEP 7: Score Tenders for Company Profiles =====")
     submit_for_scoring()
 
-    print("\n🎯 All steps completed successfully!")
+    print("\n\n🎯 All steps completed successfully!")
