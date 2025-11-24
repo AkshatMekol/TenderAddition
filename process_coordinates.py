@@ -47,7 +47,6 @@ def process_coordinates(all_missing, existing_coords, to_geocode):
                     existing_coords[loc] = coords
                 else:
                     not_found.add(loc)
-                    print(f"❌ Could not geocode: {loc}")
 
     bulk_ops = []
     count = 0
