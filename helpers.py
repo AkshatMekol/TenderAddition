@@ -50,7 +50,7 @@ def parse_date_naive(date_str):
             return None
 
 def query_deepseek(prompt, MODEL_NAME="deepseek-chat", retries=2, backoff=2):
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {DEEPSEEK_API_KEY}"}
     payload = {
         "model": MODEL_NAME,
         "messages": [{"role": "user", "content": prompt}],
