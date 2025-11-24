@@ -82,6 +82,11 @@ def cleanup():
         print("\n✅ No orphan TenderDocs or S3 folders found. Nothing to delete.")
         return
 
+    confirm = input(f"\nType 'yes' to delete {len(orphan_docs)} orphan TenderDocs and {len(orphan_s3)} orphan S3 folders: ").strip().lower()
+    if confirm != "yes":
+        print("\n❎ Deletion cancelled by user.")
+        return
+
     if orphan_docs:
         delete_orphan_tenderdocs(orphan_docs)
     else:
