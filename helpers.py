@@ -1,22 +1,33 @@
-from pymongo import ASCENDING, DESCENDING
 import re
 import json
-import certifi
-import requests
 import time
 import uuid
 import math
 import boto3
-import pandas as pd
-import multiprocessing as mp
-from bson import ObjectId
-from math import radians, sin, cos, sqrt, atan2
-from pymongo import MongoClient, UpdateOne, UpdateMany, InsertOne
-from datetime import datetime, timezone
-from tqdm import tqdm
-from dateutil import parser, tz
-from concurrent.futures import ThreadPoolExecutor
-from collections import Counter
+import certifi
+import requests
+from dateutil import parser
+from datetime import datetime
+from pymongo import MongoClient
+from config import (
+    AWS_ACCESS_KEY_ID,
+    AWS_SECRET_ACCESS_KEY,
+    AWS_REGION,
+    MONGO_URI,
+    DB_NAME,
+    DB_NAME_PAST,
+    TENDERS_COLLECTION,
+    DOCS_STATUS_COLLECTION,
+    VECTOR_COLLECTION,
+    RESULTS_COLLECTION,
+    COMPETITORS_COLLECTION,
+    PROFILES_COLLECTION,
+    SCORE_COLLECTION,
+    DEEPSEEK_API_URL,
+    DEEPSEEK_API_KEY,
+    OLA_API_KEY,
+    OLA_MAPS_BASE_URL
+)
 
 s3 = boto3.client(
     "s3",
