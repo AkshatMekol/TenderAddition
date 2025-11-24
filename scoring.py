@@ -1,3 +1,18 @@
+import json
+from tqdm import tqdm
+from bson import ObjectId
+from pymongo import InsertOne
+from collections import Counter
+from config import BATCH_SIZE
+from helpers import (
+    collection,
+    db_past,
+    competitor_collection,
+    profile_collection,
+    score_collection,
+    haversine
+)
+
 def get_tenders_matching_keywords(keywords):
     if not keywords:
         return set()
