@@ -88,7 +88,7 @@ def enrich_worker(tender):
 
     return None
 
-def location_extraction():
+def process_locations():
     # tenders = list(collection.find({"location": {"$exists": False}}))
     tenders = list(collection.find({
         "location": {"$exists": False},
