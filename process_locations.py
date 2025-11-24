@@ -1,3 +1,10 @@
+import re
+import json
+from tqdm import tqdm
+import multiprocessing as mp
+from helpers import collection, query_deepseek
+from config import STATE_CAPITALS, PROMPT_WITH_STATE, PROMPT_NO_STATE, NUM_WORKERS_DEEPSEEK
+
 def capitalize_words(text):
     return " ".join(word.capitalize() for word in text.strip().split())
 
