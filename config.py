@@ -1,5 +1,3 @@
-!pip install pymongo certifi tqdm openpyxl python-dateutil boto3
-
 import os
 from dotenv import load_dotenv
 
