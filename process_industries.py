@@ -1,3 +1,8 @@
+from tqdm import tqdm
+from pymongo import UpdateOne
+from helpers import collection     
+from config import CATEGORY_TO_INDUSTRIES, BATCH_SIZE 
+
 def map_industries(pc: str):
     if not pc:
         return None
