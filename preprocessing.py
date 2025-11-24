@@ -1,15 +1,8 @@
-def parse_date_naive(date_str):
-    if not date_str or str(date_str).strip() == "":
-        return None
-    try:
-        dt = datetime.strptime(date_str, "%d-%b-%Y %I:%M %p")
-        return dt
-    except:
-        try:
-            dt = parser.parse(date_str)
-            return dt.replace(tzinfo=None)
-        except:
-            return None
+from helpers import collection, parse_date_naive
+from config import JSONL_FILE
+import json
+from tqdm import tqdm
+from dateutil import parser
 
 def get_latest_updated_at(collection):
     latest_doc = collection.find_one(
