@@ -1,23 +1,4 @@
 !pip install pymongo certifi tqdm openpyxl python-dateutil boto3
-from pymongo import ASCENDING, DESCENDING
-import re
-import json
-import certifi
-import requests
-import time
-import uuid
-import math
-import boto3
-import pandas as pd
-import multiprocessing as mp
-from bson import ObjectId
-from math import radians, sin, cos, sqrt, atan2
-from pymongo import MongoClient, UpdateOne, UpdateMany, InsertOne
-from datetime import datetime, timezone
-from tqdm import tqdm
-from dateutil import parser, tz
-from concurrent.futures import ThreadPoolExecutor
-from collections import Counter
 
 import os
 from dotenv import load_dotenv
