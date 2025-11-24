@@ -15,3 +15,65 @@ result_collection = db_past[RESULTS_COLLECTION]
 competitor_collection = db_past[COMPETITORS_COLLECTION]
 profile_collection = db[PROFILES_COLLECTION]
 score_collection = db[SCORE_COLLECTION]
+
+def query_deepseek(prompt, MODEL_NAME="deepseek-chat", retries=2, backoff=2):
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
+    payload = {
+        "model": MODEL_NAME,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.3
+    }
+
+    for attempt in range(1, retries + 1):
+        try:
+            response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=30)
+            if response.status_code == 200:
+                data = response.json()
+                choices = data.get("choices", [])
+                if choices:
+                    content = choices[0].get("message", {}).get("content", "").strip()
+                    if content:
+                        return content
+                return '{"city": "unknown"}'
+            elif response.status_code >= 500 or response.status_code == 429:
+                time.sleep(backoff * attempt)
+                continue
+            else:
+                return 'api_error'
+        except requests.exceptions.RequestException:
+            time.sleep(backoff * attempt)
+    return 'api_error'
+
+def geocode_address(address):
+    headers = {
+        "X-Request-Id": str(uuid.uuid4()),
+        "X-Correlation-Id": str(uuid.uuid4())
+    }
+    params = {
+        "address": address,
+        "language": "English",
+        "api_key": OLA_API_KEY
+    }
+    try:
+        response = requests.get(OLA_MAPS_BASE_URL, headers=headers, params=params, timeout=15)
+        data = response.json()
+        results = data.get("geocodingResults", [])
+        if results:
+            loc = results[0].get("geometry", {}).get("location", {})
+            lat, lng = loc.get("lat"), loc.get("lng")
+            if lat is not None and lng is not None:
+                return [lat, lng]
+    except Exception as e:
+        print(f"❌ Error geocoding {address}: {e}")
+    return []
+
+def haversine(coord1, coord2):
+    if not coord1 or not coord2:
+        return float("inf")
+    lat1, lon1 = coord1
+    lat2, lon2 = coord2
+    R = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    return R * (2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
