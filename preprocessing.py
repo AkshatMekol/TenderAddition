@@ -1,4 +1,3 @@
-
 def parse_date_naive(date_str):
     if not date_str or str(date_str).strip() == "":
         return None
@@ -90,7 +89,7 @@ def find_stale_tenders(jsonl_file):
     print(f"📉 Stale tenders: {len(stale)}")
     return fresh, stale
 
-def run_cleanup():
+def preprocessing():
     print("============== DRY RUN ==============")
     closed = find_closed_tenders(JSONL_FILE)
     fresh, stale = find_stale_tenders(JSONL_FILE)
