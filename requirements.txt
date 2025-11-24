@@ -1,0 +1,6 @@
+pymongo 
+certifi 
+tqdm 
+openpyxl 
+python-dateutil 
+boto3
