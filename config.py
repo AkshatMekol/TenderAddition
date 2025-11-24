@@ -1,0 +1,735 @@
+!pip install pymongo certifi tqdm openpyxl python-dateutil boto3
+from pymongo import ASCENDING, DESCENDING
+import re
+import json
+import certifi
+import requests
+import time
+import uuid
+import math
+import boto3
+import pandas as pd
+import multiprocessing as mp
+from bson import ObjectId
+from math import radians, sin, cos, sqrt, atan2
+from pymongo import MongoClient, UpdateOne, UpdateMany, InsertOne
+from datetime import datetime, timezone
+from tqdm import tqdm
+from dateutil import parser, tz
+from concurrent.futures import ThreadPoolExecutor
+from collections import Counter
+
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_REGION = os.getenv("AWS_REGION")
+S3_BUCKET = os.getenv("S3_BUCKET")
+S3_PREFIX = "tender-documents/"
+
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+OLA_API_KEY = os.getenv("OLA_API_KEY")
+DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
+OLA_MAPS_BASE_URL = "https://api.olamaps.io/places/v1/geocode"
+
+MONGO_URI = os.getenv("MONGO_URI")
+DB_NAME = "TenderBharat"
+DB_NAME_PAST = "PastTenders"
+TENDERS_COLLECTION = "Tenders"
+VECTOR_COLLECTION = "TenderDocs"
+DOCS_STATUS_COLLECTION = "TendersDocsStatus"
+RESULTS_COLLECTION = "Results"
+COMPETITORS_COLLECTION = "Competitors"
+PROFILES_COLLECTION = "profiles"
+SCORE_COLLECTION = "CompatibilityScores"
+
+BATCH_SIZE = 5000
+NUM_WORKERS_DEEPSEEK = 50
+NUM_WORKERS_OLA = 20
+
+JSONL_FILE = "/content/tender.jsonl"
+API_KEY = "sk-7bed13f3db394798955a76a39b2d1f2f"
+
+CENTRAL_URLS = [
+    "https://eprocure.gov.in/eprocure/app",
+    "https://defproc.gov.in/nicgep/app",
+    "https://pmgsytenders.gov.in/nicgep/app",
+    "https://etenders.gov.in/eprocure/app",
+    "https://coalindiatenders.nic.in/nicgep/app",
+    "https://iocletenders.nic.in/nicgep/app",
+    "https://cpcletenders.nic.in/nicgep/app",
+    "https://eprocurebel.co.in/nicgep/app",
+    "https://eprocurentpc.nic.in/nicgep/app",
+    "https://eprocuregsl.nic.in/nicgep/app",
+    "https://eprocurehsl.nic.in/nicgep/app",
+    "https://eprocuremdl.nic.in/nicgep/app",
+    "https://www.eprocuremidhani.nic.in/nicgep/app",
+    "https://eprocuregrse.co.in/nicgep/app",
+    "https://eprocurebhel.co.in/nicgep/app",
+]
+
+STATE_URLS = {
+    "Arunachal Pradesh": "https://arunachaltenders.gov.in/nicgep/app",
+    "Andaman & Nicobar Islands": "https://eprocure.andamannicobar.gov.in/nicgep/app",
+    "Assam": "https://assamtenders.gov.in/nicgep/app",
+    "Chandigarh": "https://etenders.chd.nic.in/nicgep/app",
+    "Dadra & Nagar Haveli": "https://dnhtenders.gov.in/nicgep/app",
+    "Daman & Diu": "https://ddtenders.gov.in/nicgep/app",
+    "Delhi": "https://govtprocurement.delhi.gov.in/nicgep/app",
+    "Goa": "https://eprocure.goa.gov.in/nicgep/app",
+    "Haryana": "https://etenders.hry.nic.in/nicgep/app",
+    "Himachal Pradesh": "https://hptenders.gov.in/nicgep/app",
+    "Jammu & Kashmir": "https://jktenders.gov.in/nicgep/app",
+    "Jharkhand": "https://jharkhandtenders.gov.in/nicgep/app",
+    "Kerala": "https://etenders.kerala.gov.in/nicgep/app",
+    "Ladakh": "https://tenders.ladakh.gov.in/nicgep/app",
+    "Lakshadweep": "https://tendersutl.gov.in/nicgep/app",
+    "Maharashtra": "https://mahatenders.gov.in/nicgep/app",
+    "Madhya Pradesh": "https://mptenders.gov.in/nicgep/app",
+    "Manipur": "https://manipurtenders.gov.in/nicgep/app",
+    "Meghalaya": "https://meghalayatenders.gov.in/nicgep/app",
+    "Mizoram": "https://mizoramtenders.gov.in/nicgep/app",
+    "Nagaland": "https://nagalandtenders.gov.in/nicgep/app",
+    "Odisha": "https://tendersodisha.gov.in/nicgep/app",
+    "Puducherry": "https://pudutenders.gov.in/nicgep/app",
+    "Punjab": "https://eproc.punjab.gov.in/nicgep/app",
+    "Rajasthan": "https://eproc.rajasthan.gov.in/nicgep/app",
+    "Sikkim": "https://sikkimtender.gov.in/nicgep/app",
+    "Tamil Nadu": "https://tntenders.gov.in/nicgep/app",
+    "Tripura": "https://tripuratenders.gov.in/nicgep/app",
+    "Uttarakhand": "https://uktenders.gov.in/nicgep/app",
+    "Uttar Pradesh": "https://etender.up.nic.in/nicgep/app",
+    "West Bengal": "https://wbtenders.gov.in/nicgep/app",
+}
+
+INDUSTRIES = [
+    "Roads & Bridges",
+    "Buildings",
+    "Railways",
+    "Power & Energy",
+    "Oil & Gas",
+    "Mining",
+    "Water & Sanitation",
+    "Shipping & Marine",
+    "Aeronautical & Defense",
+    "Information Technology & Telecom",
+    "Electrical & Electronics",
+    "Mechanical & Industrial Equipment",
+    "Chemicals & Fertilizers",
+    "Metals & Materials",
+    "Agriculture & Forestry",
+    "Healthcare & Medical",
+    "Education & Training",
+    "Financial & Insurance Services",
+    "Consultancy & Professional Services",
+    "Transportation & Vehicles",
+    "Environment & Waste Management",
+    "AMC & Maintenance Services",
+    "Job Works",
+    "FMCG / Consumer Goods",
+    "Textiles & Lifestyle Products",
+    "Sports & Entertainment",
+    "Media / Publishing / Printing",
+    "Miscellaneous"
+]
+
+CATEGORY_TO_INDUSTRIES = {
+    "AMC WORKS": ["AMC & Maintenance Services"],
+    "AMC for Housekeeping Activities": ["AMC & Maintenance Services"],
+    "AMC/ Maintenance Contracts": ["AMC & Maintenance Services"],
+    "Advertisement Services": ["Media / Publishing / Printing – printing, publishing, stationery"],
+    "Agricultural or Forestry": ["Agriculture & Forestry"],
+    "Air Compressor": ["Mechanical & Industrial Equipment"],
+    "Air-Conditioner": ["Mechanical & Industrial Equipment"],
+    "Allotment of Space": ["Buildings"],
+    "Architecture/Interior Design": ["Buildings"],
+    "Audio-Visual Equipment": ["Media / Publishing / Printing – printing, publishing, stationery"],
+    "Automatic Bus Washing Machine": ["Mechanical & Industrial Equipment", "Transportation & Vehicles"],
+    "Aviation": ["Aeronautical & Defense"],
+    "Batteries and cells and accessories": ["Electrical & Electronics"],
+    "Boiler related works": ["Mechanical & Industrial Equipment", "Power & Energy"],
+    "Bus Body Construction": ["Transportation & Vehicles", "Mechanical & Industrial Equipment"],
+    "CIVIL": ["Buildings", "Roads & Bridges", "Water & Sanitation"],
+    "Cables and Wires": ["Electrical & Electronics"],
+    "Cargo / Containers": ["Transportation & Vehicles", "Shipping & Marine"],
+    "Ceramics": ["Metals & Materials"],
+    "Chemical - All": ["Chemicals & Fertilizers"],
+    "Chemical - Catalysts": ["Chemicals & Fertilizers"],
+    "Chemical - Chemicals and Additives": ["Chemicals & Fertilizers"],
+    "Chemicals": ["Chemicals & Fertilizers"],
+    "Chemicals/Minerals": ["Chemicals & Fertilizers", "Metals & Materials"],
+    "Civil - All": ["Buildings", "Roads & Bridges", "Water & Sanitation"],
+    "Civil - Roads and Bridges": ["Roads & Bridges"],
+    "Civil Construction Goods": ["Buildings", "Roads & Bridges"],
+    "Civil Works": ["Buildings", "Roads & Bridges", "Water & Sanitation"],
+    "Civil Works -  Water Works": ["Water & Sanitation"],
+    "Civil Works - Bridges": ["Roads & Bridges"],
+    "Civil Works - Building": ["Buildings"],
+    "Civil Works - Buildings": ["Buildings"],
+    "Civil Works - Canal": ["Roads & Bridges", "Water & Sanitation"],
+    "Civil Works - Highways": ["Roads & Bridges"],
+    "Civil Works - Lift Irrigation Schemes": ["Water & Sanitation", "Roads & Bridges"],
+    "Civil Works - Others": ["Buildings", "Roads & Bridges", "Water & Sanitation"],
+    "Civil Works - Roads": ["Roads & Bridges"],
+    "Civil Works - Water Works": ["Water & Sanitation"],
+    "Civil Works – Roads": ["Roads & Bridges"],
+    "Civil works": ["Buildings", "Roads & Bridges", "Water & Sanitation"],
+    "Coal": ["Mining"],
+    "Coal Works": ["Mining"],
+    "Composite Works": ["Buildings", "Roads & Bridges", "Water & Sanitation"],
+    "Computer- Data Processing": ["Information Technology & Telecom"],
+    "Computer- H/W": ["Information Technology & Telecom"],
+    "Computer- S/W": ["Information Technology & Telecom"],
+    "Condemned scrap material": ["Environment & Waste Management"],
+    "Construction Works": ["Buildings", "Roads & Bridges"],
+    "Consultancy": ["Consultancy & Professional Services"],
+    "Consultancy Services": ["Consultancy & Professional Services"],
+    "Consumables": ["FMCG / Consumer Goods"],
+    "Consumables (Hospital / Lab)": ["Healthcare & Medical"],
+    "Consumables - Cotton": ["Healthcare & Medical"],
+    "Consumables - Paper/Printing/Photocopy Paper": ["Media / Publishing / Printing – printing, publishing, stationery"],
+    "Consumables - Raw Materials": ["FMCG / Consumer Goods"],
+    "Consumables- Raw materials": ["FMCG / Consumer Goods"],
+    "Crop Products": ["Agriculture & Forestry"],
+    "Drilling Works": ["Mining", "Water & Sanitation"],
+    "Drugs and Pharmaceutical Products": ["Healthcare & Medical"],
+    "Electrical - All": ["Electrical & Electronics"],
+    "Electrical Goods": ["Electrical & Electronics"],
+    "Electrical Goods/Equipment": ["Electrical & Electronics"],
+    "Electrical Goods/Equipments": ["Electrical & Electronics"],
+    "Electrical Maintenance Service": ["AMC & Maintenance Services", "Electrical & Electronics"],
+    "Electrical Services": ["Electrical & Electronics"],
+    "Electrical Work/ Equipment": ["Electrical & Electronics"],
+    "Electrical Works": ["Electrical & Electronics"],
+    "Electrical and Maintenance Works": ["Electrical & Electronics", "AMC & Maintenance Services"],
+    "Electrical related work": ["Electrical & Electronics"],
+    "Electronic Components And Devices": ["Electrical & Electronics"],
+    "Electronic Equipment and Systems": ["Electrical & Electronics"],
+    "Electronics Equipment": ["Electrical & Electronics"],
+    "Entertainment/Musical Instruments": ["Sports & Entertainment"],
+    "Equipments": ["Mechanical & Industrial Equipment"],
+    "Equipments (Hospital / Lab)": ["Healthcare & Medical"],
+    "Excavation Department Work": ["Mining"],
+    "Explosive": ["Mining"],
+    "Facility Management Services": ["AMC & Maintenance Services"],
+    "Farm Machinery and Equipments": ["Agriculture & Forestry", "Mechanical & Industrial Equipment"],
+    "Financial and Insurance Services": ["Financial & Insurance Services"],
+    "Fire & Safety": ["AMC & Maintenance Services"],
+    "Food Products": ["FMCG / Consumer Goods"],
+    "Furniture/ Fixture": ["Textiles & Lifestyle Products"],
+    "General Repair Works": ["AMC & Maintenance Services"],
+    "Government Stock/Security": ["Financial & Insurance Services"],
+    "Handicrafts": ["Textiles & Lifestyle Products"],
+    "Handling and Transportation": ["Transportation & Vehicles"],
+    "Hardware": ["Mechanical & Industrial Equipment"],
+    "Hiring of Goods": ["Job Works"],
+    "Hiring of Vehicles": ["Transportation & Vehicles"],
+    "Hotel/ Catering": ["FMCG / Consumer Goods"],
+    "Housekeeping/ Cleaning": ["AMC & Maintenance Services"],
+    "IT Services": ["Information Technology & Telecom"],
+    "Industrial/Medical GAS": ["Healthcare & Medical"],
+    "Info. Tech. Services": ["Information Technology & Telecom"],
+    "Information Technology": ["Information Technology & Telecom"],
+    "Instrumentation - All": ["Mechanical & Industrial Equipment"],
+    "Instrumentation-Goods": ["Mechanical & Industrial Equipment"],
+    "Iron/Steel Materials": ["Metals & Materials"],
+    "Job Works": ["Job Works"],
+    "LAB / QC Equipment": ["Healthcare & Medical"],
+    "Lab Chemistry Reagents": ["Healthcare & Medical"],
+    "Laboratory Equipment": ["Healthcare & Medical"],
+    "Laboratory and scientific equipment": ["Healthcare & Medical"],
+    "Land/Building": ["Buildings"],
+    "Loading and Transportation Works/Services": ["Transportation & Vehicles"],
+    "Lump Sum TurnKey": ["Buildings", "Roads & Bridges"],
+    "Machineries": ["Mechanical & Industrial Equipment"],
+    "Machineries/ Mechanical Engg Items": ["Mechanical & Industrial Equipment"],
+    "Machineries/ Mechanical Engg Works": ["Mechanical & Industrial Equipment"],
+    "Machinery and Machining Tools": ["Mechanical & Industrial Equipment"],
+    "Maintenance Services": ["AMC & Maintenance Services"],
+    "Maintenance Works": ["AMC & Maintenance Services"],
+    "Man Power Services": ["Consultancy & Professional Services"],
+    "Manpower Supply": ["Consultancy & Professional Services"],
+    "Marine Services": ["Shipping & Marine"],
+    "Marine Works": ["Shipping & Marine"],
+    "Material Handling - Equipment": ["Mechanical & Industrial Equipment"],
+    "Materials": ["Metals & Materials"],
+    "Mechanical - All": ["Mechanical & Industrial Equipment"],
+    "Mechanical - Piping, materials, flanges, valves, seals": ["Mechanical & Industrial Equipment"],
+    "Mechanical - Pumps, Compressors, Steam Turbines and Other Equipment": ["Mechanical & Industrial Equipment"],
+    "Mechanical Engineering Items": ["Mechanical & Industrial Equipment"],
+    "Mechanical Services": ["Mechanical & Industrial Equipment"],
+    "Mechanical Tools and Equipment": ["Mechanical & Industrial Equipment"],
+    "Mechanical Works": ["Mechanical & Industrial Equipment"],
+    "Mechanical structural/Pipelines works": ["Mechanical & Industrial Equipment", "Oil & Gas"],
+    "Medical Equipments/Waste": ["Healthcare & Medical"],
+    "Medicines": ["Healthcare & Medical"],
+    "Metal Fabrication": ["Metals & Materials"],
+    "Metal Plates": ["Metals & Materials"],
+    "Metals": ["Metals & Materials"],
+    "Metals - Ferrous": ["Metals & Materials"],
+    "Micro Nutrient Chemicals/Printed Polythene Covers": ["Agriculture & Forestry", "Chemicals & Fertilizers"],
+    "Mining": ["Mining"],
+    "Miscellaneous": ["Miscellaneous"],
+    "Miscellaneous Component": ["Miscellaneous"],
+    "Miscellaneous Goods": ["Miscellaneous"],
+    "Miscellaneous Services": ["Miscellaneous"],
+    "Miscellaneous Works": ["Miscellaneous"],
+    "Network /Communication Equipments": ["Information Technology & Telecom"],
+    "Non Consumables (Hospital / Lab)": ["Healthcare & Medical"],
+    "OFC Laying Works": ["Information Technology & Telecom"],
+    "Oil/Gas": ["Oil & Gas"],
+    "Oil/Gas/Lubricants": ["Oil & Gas"],
+    "Operations & Maintenance Contract": ["AMC & Maintenance Services"],
+    "Other Services": ["Job Works"],
+    "Paint / Enamel Works": ["Buildings"],
+    "Pesticide": ["Agriculture & Forestry", "Chemicals & Fertilizers"],
+    "Photostat Services": ["Media / Publishing / Printing – printing, publishing, stationery"],
+    "Pipe Laying Works": ["Oil & Gas"],
+    "Pipes and Pipe related activities": ["Oil & Gas"],
+    "Plant Protection Input/Equipment Works": ["Agriculture & Forestry"],
+    "Plantation related works": ["Agriculture & Forestry"],
+    "Power/Energy Projects/Products": ["Power & Energy"],
+    "Public Health Estate Works": ["Water & Sanitation"],
+    "Public Health Products": ["Water & Sanitation"],
+    "Pumps/ Motors": ["Mechanical & Industrial Equipment"],
+    "Pumps/Motors": ["Mechanical & Industrial Equipment"],
+    "Raw Materials": ["Metals & Materials"],
+    "Recruitment Services": ["Consultancy & Professional Services"],
+    "Renting out / Licensing out": ["Job Works"],
+    "Repair and Maintenance Services": ["AMC & Maintenance Services"],
+    "Repair and Maintenance Works": ["AMC & Maintenance Services"],
+    "Road Works": ["Roads & Bridges"],
+    "Sale of Constructed Property": ["Buildings"],
+    "Scanning, Digitisation Services": ["Information Technology & Telecom"],
+    "Scrap/Disposables": ["Environment & Waste Management"],
+    "Security System": ["AMC & Maintenance Services", "Electrical & Electronics"],
+    "Serv - Electrical": ["Electrical & Electronics"],
+    "Serv - Others": ["Job Works"],
+    "Services": ["Job Works"],
+    "Shipping Services": ["Shipping & Marine"],
+    "Shipping/ Transportation/ Vehicle": ["Shipping & Marine", "Transportation & Vehicles"],
+    "Solar Power Plants": ["Power & Energy"],
+    "Solar Street Lights": ["Power & Energy", "Roads & Bridges"],
+    "Solid Waste Management": ["Environment & Waste Management"],
+    "Spares,Components, Assy, Sub assy": ["Mechanical & Industrial Equipment"],
+    "Sports Goods/Equipments": ["Sports & Entertainment"],
+    "Stationery": ["Media / Publishing / Printing – printing, publishing, stationery"],
+    "Street Lighting": ["Power & Energy", "Roads & Bridges"],
+    "Sugar and Allied Products": ["FMCG / Consumer Goods"],
+    "Supply and Erection": ["Buildings", "Mechanical & Industrial Equipment"],
+    "Supply of Materials": ["Mechanical & Industrial Equipment"],
+    "Supply of Materials/Hiring of Goods": ["Mechanical & Industrial Equipment", "Job Works"],
+    "Supply, Erection and Commissioning": ["Mechanical & Industrial Equipment"],
+    "Support/Maintenance Service": ["AMC & Maintenance Services"],
+    "Surveillance Equipments": ["Electrical & Electronics", "Security System"],
+    "Survey": ["Consultancy & Professional Services"],
+    "Survey and Investigation": ["Consultancy & Professional Services"],
+    "Survey and Investigation Services": ["Consultancy & Professional Services"],
+    "Survey and Investigation services": ["Consultancy & Professional Services"],
+    "Suture and related products": ["Healthcare & Medical"],
+    "TPI Agency": ["Consultancy & Professional Services"],
+    "Textile": ["Textiles & Lifestyle Products"],
+    "Transportation Services": ["Transportation & Vehicles"],
+    "Transportation Works/Services": ["Transportation & Vehicles"],
+    "Uniforms/Curtains/Clothes": ["Textiles & Lifestyle Products"],
+    "Valves": ["Mechanical & Industrial Equipment"],
+    "Vehicles/Vehicle Spares": ["Transportation & Vehicles"],
+    "Warehouse": ["Transportation & Vehicles"],
+    "Washery Construction": ["Roads & Bridges", "Mining"],
+    "Water Equipments/ Meter/ Drilling/ Boring": ["Water & Sanitation"],
+    "Water Supply": ["Water & Sanitation"],
+    "Water Supply/ Sanitation Works": ["Water & Sanitation"],
+    "Water Supply/Equipments/Meter/Drilling/Boring": ["Water & Sanitation"],
+    "Wireline Logging": ["Mining"],
+    "X Ray Films": ["Healthcare & Medical"],
+    "Access Control System": ["Electrical & Electronics"],
+    "Animal Feed Ingredients": ["Agriculture & Forestry", "FMCG / Consumer Goods"],
+    "Corporate Bonds/ Investments": ["Financial & Insurance Services"],
+    "Documentary film,Video film": ["Media / Publishing / Printing – printing, publishing, stationery", "Sports & Entertainment"],
+    "Metals - Non Ferrous": ["Metals & Materials"],
+    "Packaging": ["FMCG / Consumer Goods", "Textiles & Lifestyle Products"],
+    "Publishing/Printing": ["Media / Publishing / Printing – printing, publishing, stationery"],
+    "Solar Water Heater Services": ["Power & Energy", "Mechanical & Industrial Equipment", "AMC & Maintenance Services"],
+    "Technology Transfer Services": ["Consultancy & Professional Services", "Information Technology & Telecom"],
+    "Weighing System": ["Mechanical & Industrial Equipment", "Electrical & Electronics"],
+    "Adhesives": ["Chemicals & Fertilizers", "Mechanical & Industrial Equipment"],
+    "Administration and Welfare Services": ["Consultancy & Professional Services", "Financial & Insurance Services"],
+    "Aids and Applicances for the Disabled": ["Healthcare & Medical", "Assistive Devices for Differently Abled Persons"],
+    "Air Conditioner Related items": ["Mechanical & Industrial Equipment", "Electrical & Electronics"],
+    "Assistive Devices for Differently Abled Persons": ["Healthcare & Medical", "Electrical & Electronics"],
+    "Computer- Manpower": ["Information Technology & Telecom", "Consultancy & Professional Services"],
+    "Condemned buses and other vehicles": ["Transportation & Vehicles", "Mechanical & Industrial Equipment"],
+    "Construction": ["Buildings", "Roads & Bridges", "Railways"],
+    "Consultancy Service": ["Consultancy & Professional Services"],
+    "Crane Services": ["Mechanical & Industrial Equipment", "Transportation & Vehicles"],
+    "Dismantling and Demolition": ["Buildings", "Roads & Bridges", "Mechanical & Industrial Equipment"],
+    "Electrical - Cables, Switchgear and Other Control Equipment": ["Electrical & Electronics", "Power & Energy"],
+    "Electrical Goods and Supplies": ["Electrical & Electronics"],
+    "Equipments - General": ["Mechanical & Industrial Equipment", "Electrical & Electronics", "Chemicals & Fertilizers"],
+    "Glass Apparatus": ["Mechanical & Industrial Equipment", "Chemicals & Fertilizers", "Laboratory and Research Supplies And Equipment"],
+    "Human Resources Supply": ["Consultancy & Professional Services", "Job Works"],
+    "Instrumentation Services": ["Mechanical & Industrial Equipment", "Electrical & Electronics"],
+    "Interior / Furniture": ["Buildings", "Education & Training", "Healthcare & Medical"],
+    "Laboratory and Research Supplies And Equipment": ["Laboratory and Research Supplies And Equipment", "Chemicals & Fertilizers", "Healthcare & Medical"],
+    "Loading Works/ Services": ["Transportation & Vehicles", "Mechanical & Industrial Equipment"],
+    "Machineries Services": ["Mechanical & Industrial Equipment", "Mining", "Metals & Materials"],
+    "Maintenance Goods": ["AMC & Maintenance Services", "Mechanical & Industrial Equipment", "Electrical & Electronics"],
+    "Manpower Supply Services": ["Consultancy & Professional Services", "Job Works"],
+    "Mechanical - Pressure vessels and other fabrications": ["Mechanical & Industrial Equipment", "Power & Energy"],
+    "Mechanical - Sealing, Packing Material, Gaskets": ["Mechanical & Industrial Equipment", "Chemicals & Fertilizers"],
+    "Mechanical Engg Items": ["Mechanical & Industrial Equipment"],
+    "Moulded Component": ["Mechanical & Industrial Equipment", "Metals & Materials"],
+    "Multi-crop Thresher": ["Agriculture & Forestry", "Mechanical & Industrial Equipment"],
+    "Non-Explosive": ["Mining", "Construction", "Mechanical & Industrial Equipment"],
+    "Over Burden Removal works": ["Mining", "Mechanical & Industrial Equipment"],
+    "Packing": ["FMCG / Consumer Goods", "Mechanical & Industrial Equipment", "Chemicals & Fertilizers"],
+    "Painting works": ["Buildings", "Mechanical & Industrial Equipment", "Consultancy & Professional Services"],
+    "Photostat services": ["Media / Publishing / Printing", "Consultancy & Professional Services"],
+    "Power Packs(Hydralic, Solar, etc.,)": ["Power & Energy", "Mechanical & Industrial Equipment", "Electrical & Electronics"],
+    "Sale of Open Plot": ["Buildings", "Miscellaneous"],
+    "Sale of Stones": ["Mining", "Construction", "Metals & Materials"],
+    "Sanitory Works": ["Water & Sanitation", "Buildings", "Mechanical & Industrial Equipment"],
+    "Software Purchase and S/w AMC": ["Information Technology & Telecom", "Consultancy & Professional Services"],
+    "Solar Water Heaters": ["Power & Energy", "Mechanical & Industrial Equipment", "Water & Sanitation"],
+    "Surgicals and Sutures": ["Healthcare & Medical", "Chemicals & Fertilizers"],
+    "Transportation Works": ["Roads & Bridges", "Transportation & Vehicles", "Railways"],
+    "UPS": ["Electrical & Electronics", "Power & Energy"],
+    "Waste Paper": ["FMCG / Consumer Goods", "Media / Publishing / Printing", "Environment & Waste Management"],
+    "A/C ORG": ["Mechanical & Industrial Equipment"],
+    "Bulk Loading Explosives": ["Mining", "Oil & Gas", "Aeronautical & Defense"],
+    "CARRIAGE": ["Transportation & Vehicles"],
+    "CCTV M/R": ["Electrical & Electronics", "AMC & Maintenance Services"],
+    "CCTV ORG": ["Electrical & Electronics"],
+    "CEMENT": ["Roads & Bridges", "Buildings", "Metals & Materials"],
+    "CIVIL AND ELECTRICAL WORKS": ["Buildings", "Electrical & Electronics", "Mechanical & Industrial Equipment"],
+    "CIVIL WORKS": ["Buildings", "Roads & Bridges"],
+    "Clothing/Garments": ["Textiles & Lifestyle Products"],
+    "ELECTRICAL WORKS M/R": ["Electrical & Electronics", "AMC & Maintenance Services"],
+    "ELECTRICAL WORKS ORG": ["Electrical & Electronics"],
+    "EXIBITION/EVENT": ["Sports & Entertainment", "Media / Publishing / Printing"],
+    "Electric Works": ["Electrical & Electronics", "Mechanical & Industrial Equipment"],
+    "FIRE FIGHTING M/R": ["Mechanical & Industrial Equipment", "AMC & Maintenance Services"],
+    "FIRE FIGHTING ORG": ["Mechanical & Industrial Equipment"],
+    "Fertilizer": ["Chemicals & Fertilizers", "Agriculture & Forestry"],
+    "Fleet Management": ["Transportation & Vehicles", "Consultancy & Professional Services"],
+    "Group Medical Insurance": ["Financial & Insurance Services", "Healthcare & Medical"],
+    "HAND PUMP": ["Water & Sanitation", "Mechanical & Industrial Equipment"],
+    "Health Insurance": ["Financial & Insurance Services", "Healthcare & Medical"],
+    "INSURANCE": ["Financial & Insurance Services"],
+    "IT SERVICES - HARDWARE": ["Information Technology & Telecom", "Electrical & Electronics"],
+    "IT SERVICES - SOFTWARE": ["Information Technology & Telecom"],
+    "IT WORKS M/R": ["Information Technology & Telecom", "AMC & Maintenance Services"],
+    "IT WORKS ORG": ["Information Technology & Telecom"],
+    "Instrumentation services": ["Mechanical & Industrial Equipment", "Electrical & Electronics"],
+    "Insulation work": ["Mechanical & Industrial Equipment", "Buildings"],
+    "MECHANICAL": ["Mechanical & Industrial Equipment"],
+    "MISC ELECTRICAL WORKS": ["Electrical & Electronics", "Miscellaneous"],
+    "PLUMBING WORKS M/R": ["Buildings", "AMC & Maintenance Services"],
+    "PLUMBING WORKS ORG": ["Buildings"],
+    "Plant Protection Input": ["Agriculture & Forestry", "Chemicals & Fertilizers"],
+    "Press Board Items": ["Media / Publishing / Printing", "Miscellaneous"],
+    "Printing of PVC/ Plastic Cards": ["Media / Publishing / Printing", "FMCG / Consumer Goods"],
+    "Project Work": ["Consultancy & Professional Services", "Miscellaneous"],
+    "REPAIRING OF VEHICLES": ["Transportation & Vehicles", "AMC & Maintenance Services"],
+    "Refractory/castable works": ["Metals & Materials", "Roads & Bridges", "Buildings"],
+    "Rubber / Cork Items": ["FMCG / Consumer Goods", "Miscellaneous"],
+    "SUPPLY OF CIVIL GOODS/EQUIPMENTS": ["Buildings", "Mechanical & Industrial Equipment"],
+    "SUPPLY OF ELECTRICAL GOODS/EQUIPMENTS": ["Electrical & Electronics", "Mechanical & Industrial Equipment"],
+    "Security": ["Consultancy & Professional Services", "Aeronautical & Defense"],
+    "Supply": ["Miscellaneous", "FMCG / Consumer Goods"],
+    "Supply/Erection and Commissioning": ["Mechanical & Industrial Equipment", "Electrical & Electronics"],
+    "Ferro Alloys": ["Mechanical & Industrial Equipment"],
+    "Aids and Appliances for the disabled": ["Healthcare & Medical"],
+    "Solar Water Heater": ["Power & Energy", "Mechanical & Industrial Equipment", "AMC & Maintenance Services"],
+    "Administration - All": ["Consultancy & Professional Services"],
+    "Administration - Catering/Canteen": ["FMCG / Consumer Goods", "Consultancy & Professional Services"],
+    "Administration - Horticulture, Grass cutting, Tree planting": ["Agriculture & Forestry", "Environment & Waste Management"],
+    "Administration - Housekeeping": ["AMC & Maintenance Services"],
+    "Administration - Stationaries, Promotional Items": ["Media / Publishing / Printing", "FMCG / Consumer Goods"],
+    "Administration - Ticketing": ["Transportation & Vehicles", "Consultancy & Professional Services"],
+    "Administration and Welfare works": ["Consultancy & Professional Services"],
+    "Aids and appliances for the disabled": ["Healthcare & Medical"],
+    "Aids and applicances for the disabled": ["Healthcare & Medical"],
+    "Ash Handling Equipments": ["Power & Energy", "Mechanical & Industrial Equipment"],
+    "Automobile Engines/Equipment": ["Transportation & Vehicles", "Mechanical & Industrial Equipment"],
+    "Bearings": ["Mechanical & Industrial Equipment"],
+    "Bio Fertiliser Production Unit": ["Agriculture & Forestry", "Chemicals & Fertilizers"],
+    "Bio-Fertilizer Production": ["Agriculture & Forestry", "Chemicals & Fertilizers"],
+    "Bio-Fertilizer Production Materials": ["Agriculture & Forestry", "Chemicals & Fertilizers"],
+    "Bread and Bakery Products": ["FMCG / Consumer Goods"],
+    "Canteen Catering Services": ["FMCG / Consumer Goods", "Consultancy & Professional Services"],
+    "Catridge Explosives and Accessories": ["Mining", "Oil & Gas"],
+    "Charter Hiring of Onshore Work-Over Rigs": ["Oil & Gas"],
+    "Chemical - Handling": ["Chemicals & Fertilizers", "Environment & Waste Management"],
+    "Civil - Disposal of Scrap": ["Environment & Waste Management", "Buildings"],
+    "Civil - Furniture maintenance, Carpentry, Plumbing, Sanitary Works": ["AMC & Maintenance Services", "Buildings"],
+    "Civil - Painting, Sand blasting": ["Buildings", "AMC & Maintenance Services"],
+    "Civil - Provision of Rigging, Scaffolding facilities": ["Buildings", "Mechanical & Industrial Equipment"],
+    "Civil - Refractory and Insulation Material": ["Metals & Materials", "Buildings"],
+    "Civil - Refractory and Insulation material": ["Metals & Materials", "Buildings"],
+    "Civil - Treatment Plant": ["Water & Sanitation", "Buildings"],
+    "Civil - Waterproofing, Fireproofing, Insulation works": ["Buildings", "AMC & Maintenance Services"],
+    "Civil Construction": ["Buildings", "Roads & Bridges"],
+    "Civil Services": ["Buildings", "Consultancy & Professional Services"],
+    "Civil Works - Bridge Construction": ["Roads & Bridges", "Buildings"],
+    "Civil Works - Lift Irrigation Scheme": ["Water & Sanitation", "Buildings"],
+    "Civil Works – Canal": ["Water & Sanitation", "Buildings"],
+    "Civil Works – Highways": ["Roads & Bridges"],
+    "Civil Works – Lift Irrigation Schemes": ["Water & Sanitation", "Buildings"],
+    "Civil Works – Others": ["Buildings"],
+    "Civil Works – Water Works": ["Buildings", "Water & Sanitation"],
+    "Coal Loading and Transportation works": ["Mining", "Transportation & Vehicles"],
+    "Coal Loading/Loading Works": ["Mining", "Transportation & Vehicles"],
+    "Coal Transportation/Transportation Works": ["Mining", "Transportation & Vehicles"],
+    "Communication System Equipments": ["Information Technology & Telecom", "Electrical & Electronics"],
+    "Computer-Data Processing": ["Information Technology & Telecom"],
+    "Consultancy Works": ["Consultancy & Professional Services"],
+    "Copper Component": ["Metals & Materials", "Mechanical & Industrial Equipment"],
+    "DRILLING WORKS": ["Oil & Gas", "Mining"],
+    "Deprecated": ["Miscellaneous"],
+    "Edible Oils": ["FMCG / Consumer Goods"],
+    "Electrical - AC Maintenance": ["Electrical & Electronics", "AMC & Maintenance Services"],
+    "Electrical - Generators": ["Power & Energy", "Electrical & Electronics"],
+    "Electrical - Lighting and luminaries": ["Electrical & Electronics", "Buildings"],
+    "Electrical - Motors and other equipments": ["Electrical & Electronics", "Mechanical & Industrial Equipment"],
+    "Electrical - Telephone/Water Coolers/CCTV maintenance": ["Electrical & Electronics", "AMC & Maintenance Services"],
+    "Electrical Equipment and Systems": ["Electrical & Electronics"],
+    "Extraction of Coal and Coal Measure Strata": ["Mining"],
+    "FISH/SCAMPI/SHRIMP SEEDS": ["Agriculture & Forestry"],
+    "Fasteners and Hardware": ["Mechanical & Industrial Equipment", "Metals & Materials"],
+    "Fiber Glass Items": ["Metals & Materials", "Buildings"],
+    "Fire and Safety - Supply of Foam, Fire Fighting Delivery Hose": ["Buildings", "Environment & Waste Management"],
+    "Fire and safety - Supply of Foam, Fire Fighting Delivery Hose": ["Buildings", "Environment & Waste Management"],
+    "Fluid And Gas Flow Equipment": ["Mechanical & Industrial Equipment", "Oil & Gas"],
+    "Fumigation works": ["Environment & Waste Management", "Agriculture & Forestry"],
+    "General Insurance": ["Financial & Insurance Services"],
+    "Gold and Silver Coins/Bars": ["Metals & Materials"],
+    "Goods": ["Miscellaneous"],
+    "Gypsum": ["Metals & Materials", "Buildings"],
+    "Haulage Handling Services": ["Transportation & Vehicles", "Mechanical & Industrial Equipment"],
+    "Health": ["Healthcare & Medical"],
+    "Health Medicines": ["Healthcare & Medical"],
+    "Horticulture Services": ["Agriculture & Forestry", "Environment & Waste Management"],
+    "Hosekeeping/ Cleaning Works": ["AMC & Maintenance Services"],
+    "Hospital Equipments": ["Healthcare & Medical", "Mechanical & Industrial Equipment"],
+    "Hotel / Tourism": ["FMCG / Consumer Goods", "Buildings"],
+    "Housekeeping Services": ["AMC & Maintenance Services"],
+    "Hydrogen Generation": ["Power & Energy", "Chemicals & Fertilizers"],
+    "ICT Equipments, Computer H/W": ["Information Technology & Telecom", "Electrical & Electronics"],
+    "IT - AMC, Facility Management": ["Information Technology & Telecom", "AMC & Maintenance Services"],
+    "IT - All": ["Information Technology & Telecom"],
+    "IT - Procurement of IT related h/w": ["Information Technology & Telecom"],
+    "IT - S/W develpoment; Systems Integration, Networking": ["Information Technology & Telecom"],
+    "IT - Works related": ["Information Technology & Telecom"],
+    "Infotech Services": ["Information Technology & Telecom", "Consultancy & Professional Services"],
+    "Jute Products": ["Textiles & Lifestyle Products", "Agriculture & Forestry"],
+    "Laptop, Desktop and Accessories": ["Information Technology & Telecom"],
+    "Liquor": ["FMCG / Consumer Goods"],
+    "Locomotive System": ["Railways", "Transportation & Vehicles"],
+    "Material Handling": ["Mechanical & Industrial Equipment", "Transportation & Vehicles"],
+    "Material Handling - Carrying and Forwarding services": ["Transportation & Vehicles", "Mechanical & Industrial Equipment"],
+    "Measuring Instruments": ["Mechanical & Industrial Equipment", "Electrical & Electronics"],
+    "Mechanical - Fasteners": ["Mechanical & Industrial Equipment"],
+    "Mechanical - LPG fabrication": ["Oil & Gas", "Mechanical & Industrial Equipment"],
+    "Mechanical - Loading arms; Swivel joints; Metallic hoses etc.": ["Oil & Gas", "Mechanical & Industrial Equipment"],
+    "Mechanical - Rigging and Haulage equipment": ["Mechanical & Industrial Equipment", "Buildings"],
+    "Mechanical Maintenance Services": ["Mechanical & Industrial Equipment", "AMC & Maintenance Services"],
+    "Medical Equipments and Waste": ["Healthcare & Medical", "Environment & Waste Management"],
+    "Mgmt. Of Stockyard in JV": ["Transportation & Vehicles", "Mining"],
+    "Minor Forest Produce": ["Agriculture & Forestry"],
+    "Nabard & Rural Roads": ["Roads & Bridges", "Buildings"],
+    "Non-Dietery Items": ["FMCG / Consumer Goods"],
+    "Offshore Vessels": ["Shipping & Marine", "Oil & Gas"],
+    "Organic Manure": ["Agriculture & Forestry", "Environment & Waste Management"],
+    "Other Insulation Items": ["Buildings", "Metals & Materials"],
+    "Packing Material - Mettalic/Non Mettalic containers, Pouches, Cartons etc.": ["FMCG / Consumer Goods", "Media / Publishing / Printing"],
+    "Paddy Transplanter": ["Agriculture & Forestry", "Mechanical & Industrial Equipment"],
+    "Painting Works": ["Buildings", "AMC & Maintenance Services"],
+    "Perma Wood Items": ["Buildings", "Metals & Materials"],
+    "Pipe / Fittings": ["Water & Sanitation", "Mechanical & Industrial Equipment"],
+    "Pipes and Pipe Fittings": ["Water & Sanitation", "Mechanical & Industrial Equipment"],
+    "Plant Protection Input/Equipment": ["Agriculture & Forestry", "Chemicals & Fertilizers"],
+    "Power Packs": ["Power & Energy", "Mechanical & Industrial Equipment"],
+    "Power Tiller with Trailer and Accessories": ["Agriculture & Forestry", "Mechanical & Industrial Equipment"],
+    "Printed Publications": ["Media / Publishing / Printing"],
+    "Printing/Binding related works": ["Media / Publishing / Printing"],
+    "Rail Transportation": ["Railways", "Transportation & Vehicles"],
+    "Raw Cashew Nuts": ["Agriculture & Forestry"],
+    "Sale of land": ["Buildings"],
+    "Serv - Administrative": ["Consultancy & Professional Services"],
+    "Serv - Autobase": ["Transportation & Vehicles", "Mechanical & Industrial Equipment"],
+    "Serv - Civil": ["Buildings", "AMC & Maintenance Services"],
+    "Serv - Information Technology": ["Information Technology & Telecom"],
+    "Serv - Mechanical": ["Mechanical & Industrial Equipment", "AMC & Maintenance Services"],
+    "Serv - Medical": ["Healthcare & Medical"],
+    "Serv - Stores": ["Consultancy & Professional Services"],
+    "Serv -Instrumentation": ["Electrical & Electronics", "Mechanical & Industrial Equipment"],
+    "Shredder Machine": ["Environment & Waste Management", "Mechanical & Industrial Equipment"],
+    "Solar Battery Chargers": ["Power & Energy", "Electrical & Electronics"],
+    "Solid Waste Management Works": ["Environment & Waste Management"],
+    "Stone Works": ["Metals & Materials", "Buildings"],
+    "Stones/Granites/Gypsum Works": ["Metals & Materials", "Buildings"],
+    "Supply of OTR Tyres/Tubes/ Flaps": ["Transportation & Vehicles"],
+    "Supply/Erection/Commissioning Services": ["Mechanical & Industrial Equipment", "Electrical & Electronics", "AMC & Maintenance Services"],
+    "Survey related works": ["Consultancy & Professional Services", "Buildings"],
+    "Tailoring/Sewing Machines": ["Textiles & Lifestyle Products"],
+    "Tendu Leaves": ["Agriculture & Forestry"],
+    "Toll Gate": ["Transportation & Vehicles", "Roads & Bridges"],
+    "Transportation - Automobiles and Automotive parts": ["Transportation & Vehicles", "Mechanical & Industrial Equipment"],
+    "Turbines": ["Power & Energy", "Mechanical & Industrial Equipment"],
+    "Vermi Composting": ["Agriculture & Forestry", "Environment & Waste Management"],
+    "Washery": ["Mining", "Environment & Waste Management"],
+    "Welding Machines/Equipment": ["Mechanical & Industrial Equipment", "AMC & Maintenance Services"],
+    "TREE": ["Environment & Waste Management", "Agriculture and Forestry"]
+}
+
+STATE_CAPITALS = {
+    "Andhra Pradesh": "Amaravati",
+    "Arunachal Pradesh": "Itanagar",
+    "Assam": "Dispur",
+    "Bihar": "Patna",
+    "Chandigarh": "Chandigarh",
+    "Chhattisgarh": "Raipur",
+    "Delhi": "New Delhi",
+    "Goa": "Panaji",
+    "Gujarat": "Gandhinagar",
+    "Haryana": "Chandigarh",
+    "Himachal Pradesh": "Shimla",
+    "Jammu & Kashmir": "Srinagar",
+    "Jharkhand": "Ranchi",
+    "Karnataka": "Bengaluru",
+    "Kerala": "Thiruvananthapuram",
+    "Ladakh": "Leh",
+    "Madhya Pradesh": "Bhopal",
+    "Maharashtra": "Mumbai",
+    "Manipur": "Imphal",
+    "Meghalaya": "Shillong",
+    "Mizoram": "Aizawl",
+    "Nagaland": "Kohima",
+    "Odisha": "Bhubaneswar",
+    "Puducherry": "Puducherry",
+    "Punjab": "Chandigarh",
+    "Rajasthan": "Jaipur",
+    "Sikkim": "Gangtok",
+    "Tamil Nadu": "Chennai",
+    "Telangana": "Hyderabad",
+    "Tripura": "Agartala",
+    "Uttar Pradesh": "Lucknow",
+    "Uttarakhand": "Dehradun",
+    "West Bengal": "Kolkata",
+    "Andaman & Nicobar Islands": "Port Blair",
+    "Dadra & Nagar Haveli": "Silvassa",
+    "Daman & Diu": "Daman",
+    "Lakshadweep": "Kavaratti"
+}
+
+PROMPT_WITH_STATE = """
+                    Inputs:
+                    - Organisation: {organization}
+                    - Description: {description}
+                    - State: {state}
+
+                    Extract the exact city location -
+
+                    Rules:
+                    1. Only return the single city, do not return state.
+                    2. Return strictly as a JSON dictionary: {{"city": "CityName"}}.
+                    3. If city cannot be determined, return {{"city": "unknown"}}.
+                    """
+
+PROMPT_NO_STATE = """
+                  Inputs:
+                  - Organisation: {organization}
+                  - Description: {description}
+
+                  Extract the exact site location -
+
+                  Rules:
+                  1. Determine both city and state if possible. Only a single most relevant city and a single most relevant state.
+                  2. Return strictly as a JSON dictionary: {{"city": "CityName", "state": "StateName"}}.
+                  3. If city or state cannot be determined, return "unknown" for the missing field.
+                  """
+
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+    region_name=AWS_REGION,
+)
+
+client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
+db = client[DB_NAME]
+db_past = client[DB_NAME_PAST]
+collection = db[TENDERS_COLLECTION]
+status_collection = db[DOCS_STATUS_COLLECTION]
+vector_collection = db[VECTOR_COLLECTION]
+result_collection = db_past[RESULTS_COLLECTION]
+competitor_collection = db_past[COMPETITORS_COLLECTION]
+profile_collection = db[PROFILES_COLLECTION]
+score_collection = db[SCORE_COLLECTION]
+
+def query_deepseek(prompt, MODEL_NAME="deepseek-chat", retries=2, backoff=2):
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
+    payload = {
+        "model": MODEL_NAME,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.3
+    }
+
+    for attempt in range(1, retries + 1):
+        try:
+            response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=30)
+            if response.status_code == 200:
+                data = response.json()
+                choices = data.get("choices", [])
+                if choices:
+                    content = choices[0].get("message", {}).get("content", "").strip()
+                    if content:
+                        return content
+                return '{"city": "unknown"}'
+            elif response.status_code >= 500 or response.status_code == 429:
+                time.sleep(backoff * attempt)
+                continue
+            else:
+                return 'api_error'
+        except requests.exceptions.RequestException:
+            time.sleep(backoff * attempt)
+    return 'api_error'
+
+def geocode_address(address):
+    headers = {
+        "X-Request-Id": str(uuid.uuid4()),
+        "X-Correlation-Id": str(uuid.uuid4())
+    }
+    params = {
+        "address": address,
+        "language": "English",
+        "api_key": OLA_API_KEY
+    }
+    try:
+        response = requests.get(OLA_MAPS_BASE_URL, headers=headers, params=params, timeout=15)
+        data = response.json()
+        results = data.get("geocodingResults", [])
+        if results:
+            loc = results[0].get("geometry", {}).get("location", {})
+            lat, lng = loc.get("lat"), loc.get("lng")
+            if lat is not None and lng is not None:
+                return [lat, lng]
+    except Exception as e:
+        print(f"❌ Error geocoding {address}: {e}")
+    return []
+
+def haversine(coord1, coord2):
+    if not coord1 or not coord2:
+        return float("inf")
+    lat1, lon1 = coord1
+    lat2, lon2 = coord2
+    R = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    return R * (2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
