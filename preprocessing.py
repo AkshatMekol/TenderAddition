@@ -83,12 +83,10 @@ def find_stale_tenders(jsonl_file):
     return fresh, stale
 
 def preprocessing():
-    print("============== DRY RUN ==============")
     closed = find_closed_tenders(JSONL_FILE)
     fresh, stale = find_stale_tenders(JSONL_FILE)
 
-    print("\n============== SUMMARY ==============")
-    print(f"🔸 Closed tenders to delete from Mongo: {len(closed)}")
+    print(f"\n🔸 Closed tenders to delete from Mongo: {len(closed)}")
     print(f"🔸 Stale tenders to delete from JSONL: {len(stale)}")
 
     confirm = input("\n❓ Proceed with deletion? (yes/no): ").strip().lower()
