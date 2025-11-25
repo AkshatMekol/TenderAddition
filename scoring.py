@@ -173,7 +173,7 @@ def submit_for_scoring():
         })
     print(f"🚀 Preprocessed {len(tenders)} tenders once.")
 
-    batch_size = 50000
+    batch_size = BATCH_SIZE
     ops = []
 
     for profile in tqdm(profiles, desc="Scoring profiles"):
