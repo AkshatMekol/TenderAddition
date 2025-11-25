@@ -5,3 +5,4 @@ tqdm
 openpyxl 
 python-dateutil 
 boto3
+dotenv
