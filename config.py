@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+JSONL_FILE = "/home/ubuntu/TenderScraper/TenderData/Tenders/23_Nov_2025/tender.jsonl"
+
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.getenv("AWS_REGION")
@@ -29,9 +31,6 @@ SCORE_COLLECTION = "CompatibilityScores"
 BATCH_SIZE = 5000
 NUM_WORKERS_DEEPSEEK = 50
 NUM_WORKERS_OLA = 20
-
-JSONL_FILE = "/home/ubuntu/TenderScraper/TenderData/Tenders/23_Nov_2025/tender.jsonl"
-API_KEY = "sk-7bed13f3db394798955a76a39b2d1f2f"
 
 CENTRAL_URLS = [
     "https://eprocure.gov.in/eprocure/app",
