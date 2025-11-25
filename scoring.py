@@ -158,6 +158,8 @@ def score_small_tender(company_info, tender_info, participation_score):
     return round(total_score, 1)
 
 def submit_for_scoring():
+    score_collection.drop()
+    print("✅ CompatibilityScores collection dropped.")
     profiles = list(profile_collection.find({}, {"company_info": 1, "company_name": 1, "user_id": 1}))
     tenders_cursor = collection.find({}, {"tender_value": 1, "coordinates": 1, "organization": 1, "website": 1, "organization_type": 1})
 
@@ -237,3 +239,6 @@ def submit_for_scoring():
         score_collection.bulk_write(ops, ordered=False)
 
     print("✅ Scoring completed and stored successfully.")
+    score_collection.create_index([("user_id", 1), ("score", -1)])
+    score_collection.create_index([("tender_id", 1), ("user_id", 1)], unique=True)
+    print("✅ Indexes created successfully.")
