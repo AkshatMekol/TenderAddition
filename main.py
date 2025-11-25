@@ -1,4 +1,4 @@
-from preporcessing import preprocessing.py
+from preprocessing import preprocessing
 from cleanup import cleanup
 from upsertion import upsertion
 from process_industries import process_industries
