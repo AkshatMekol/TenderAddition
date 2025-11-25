@@ -72,6 +72,7 @@ def cleanup():
     valid_ids = get_valid_tender_ids()
     s3_folders = scan_s3_folders()
     orphan_s3 = get_orphan_s3_folders(s3_folders, valid_ids)
+    print("\n")
     get_total_distinct_tenderdocs_ids()
     orphan_docs = get_orphan_tenderdocs(valid_ids)
 
