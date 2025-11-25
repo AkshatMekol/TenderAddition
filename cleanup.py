@@ -5,7 +5,6 @@ from tqdm import tqdm
 
 def get_valid_tender_ids():
     valid_ids = [str(_id) for _id in collection.distinct("_id")]
-    print(f"📊 Total distinct tender_ids in Mongo: {len(valid_ids)}\n")
     return valid_ids
 
 def get_total_distinct_tenderdocs_ids():
@@ -48,7 +47,6 @@ def get_orphan_s3_folders(folders, valid_ids):
     total_size = sum(folders.values())
     orphan_size = sum(folders[f] for f in orphans_s3)
     print(f"⚠️ Orphan Folder Count: {len(orphans_s3)}")
-    print(f"📊 Total S3 Storage: {total_size / (1024**3):.2f} GB")
     return orphans_s3
 
 def delete_s3_folder(folder):
@@ -72,10 +70,10 @@ def delete_orphan_s3_folders(orphans_s3):
 
 def cleanup():
     valid_ids = get_valid_tender_ids()
-    get_total_distinct_tenderdocs_ids()
-    orphan_docs = get_orphan_tenderdocs(valid_ids)
     s3_folders = scan_s3_folders()
     orphan_s3 = get_orphan_s3_folders(s3_folders, valid_ids)
+    get_total_distinct_tenderdocs_ids()
+    orphan_docs = get_orphan_tenderdocs(valid_ids)
 
     total_orphans = len(orphan_docs) + len(orphan_s3)
     if total_orphans == 0:
