@@ -9,7 +9,6 @@ def worker(location):
     return location, coords
 
 def prepare_locations():
-    print("\n===== Preparing Locations for Geocoding =====\n")
     query_missing = {"$or": [{"coordinates": {"$exists": False}}, {"coordinates": {"$size": 0}}]}
     all_missing_locations = collection.distinct("location", query_missing)
 
@@ -37,7 +36,6 @@ def prepare_locations():
     return all_missing_locations, existing_coords, to_geocode
 
 def process_coordinates(all_missing, existing_coords, to_geocode):
-    print("\n===== Processing Locations =====\n")
     not_found = set()
 
     if to_geocode:
@@ -74,10 +72,3 @@ def process_coordinates(all_missing, existing_coords, to_geocode):
     print(f"🎉 Geocoding and updates completed.")
     print(f"✅ Total documents updated with coordinates: {count}")
     print(f"⚠️ Locations that remain without coordinates (API failed): {len(not_found)}")
-    if not_found:
-        print(f"❌ Locations not found: {list(not_found)}\n")
-
-
-if __name__ == "__main__":
-    all_missing, existing_coords, to_geocode = prepare_locations()
-    process_locations(all_missing, existing_coords, to_geocode)
