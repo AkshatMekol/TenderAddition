@@ -1,7 +1,7 @@
 from preporcessing import preprocessing.py
 from cleanup import cleanup
 from upsertion import upsertion
-from process_industires import process_industries
+from process_industries import process_industries
 from process_locations import process_locations
 from process_coordinates import prepare_locations, process_coordinates
 from scoring import submit_for_scoring
