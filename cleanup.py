@@ -4,10 +4,6 @@ from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 
 def get_valid_tender_ids():
-    valid_ids = [str(_id) for _id in collection.distinct("_id")]
-    return valid_ids
-
-def get_valid_tender_ids():
     valid_ids = set(str(_id) for _id in collection.distinct("_id"))
     all_profiles = profiles_collection.find({}, {"my_tenders.id": 1})
 
