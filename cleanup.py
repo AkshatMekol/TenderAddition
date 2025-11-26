@@ -1,11 +1,11 @@
-from helpers import collection, vector_collection, profiles_collection s3
+from helpers import collection, vector_collection, profile_collection, s3
 from config import S3_BUCKET, S3_PREFIX
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 
 def get_valid_tender_ids():
     valid_ids = set(str(_id) for _id in collection.distinct("_id"))
-    all_profiles = profiles_collection.find({}, {"my_tenders.id": 1})
+    all_profiles = profile_collection.find({}, {"my_tenders.id": 1})
 
     for profile in all_profiles:
         for tender in profile.get("my_tenders", []):
