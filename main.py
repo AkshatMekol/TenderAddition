@@ -6,6 +6,7 @@ from process_locations import process_locations
 from process_coordinates import prepare_locations, process_coordinates
 from create_embeddings import create_embeddings
 from scoring import submit_for_scoring
+from rescoring import rescore
 
 if __name__ == "__main__":
 
@@ -35,6 +36,6 @@ if __name__ == "__main__":
     submit_for_scoring()
 
     print("\n\n\n==================== STEP 9: Recommendation Scoring for Saved ====================")
-
+    rescore()
 
     print("\n\n\n🎯 All steps completed successfully!")
