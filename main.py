@@ -4,6 +4,7 @@ from upsertion import upsertion
 from process_industries import process_industries
 from process_locations import process_locations
 from process_coordinates import prepare_locations, process_coordinates
+from create_embeddings import create_embeddings
 from scoring import submit_for_scoring
 
 if __name__ == "__main__":
@@ -27,7 +28,13 @@ if __name__ == "__main__":
     all_missing, existing_coords, to_geocode = prepare_locations()
     process_coordinates(all_missing, existing_coords, to_geocode)
 
-    print("\n\n\n==================== STEP 7: Score Tenders for Company Profiles ====================")
+    print("\n\n\n==================== STEP 7: Create Embeddings for Tenders ====================")
+    create_embeddings()
+
+    print("\n\n\n==================== STEP 8: Score Tenders for Company Profiles ====================")
     submit_for_scoring()
+
+    print("\n\n\n==================== STEP 9: Recommendation Scoring for Saved ====================")
+
 
     print("\n\n\n🎯 All steps completed successfully!")
