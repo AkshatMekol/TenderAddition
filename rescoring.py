@@ -1,25 +1,11 @@
-from pymongo import MongoClient, UpdateOne
-from bson import ObjectId
-from tqdm import tqdm
 import time
-from helpers import collection
+from tqdm import tqdm
+from bson import ObjectId
+from pymongo import MongoClient, UpdateOne
+from config import VECTOR_INDEX_NAME, TOP_K
+from helpers import collection, profile_collection, score_collection
 
-# ----------------------------- CONFIG -----------------------------
-
-COLL_TENDERS = "Tenders"
-COLL_PROFILES = "profiles"
-COLL_SCORES = "CompatibilityScores"
-VECTOR_INDEX_NAME = "tenders_vector_index"
-TOP_K = 250
-
-client = MongoClient(MONGO_CONN)
-db = client[DB]
-tenders_col = db[COLL_TENDERS]
-profiles_col = db[COLL_PROFILES]
-score_col = db[COLL_SCORES]
-
-# ----------------------------- VECTOR SEARCH -----------------------------
-def vector_search_fast(query_vec, top_k=TOP_K):
+def vector_search(query_vec, top_k=TOP_K):
     pipeline = [
         {
             "$vectorSearch": {
@@ -32,7 +18,7 @@ def vector_search_fast(query_vec, top_k=TOP_K):
         },
         {
             "$project": {
-                "_id": 1,                      # include _id
+                "_id": 1,                     
                 "score": {"$meta": "vectorSearchScore"}
             }
         }
@@ -43,11 +29,9 @@ def vector_search_fast(query_vec, top_k=TOP_K):
     print(f"⏱ Vector search: {time.time() - start:.2f}s — {len(results)} results")
     return results
     
-# ----------------------------- ADD SIMILARITY SCORES FOR ALL USERS -----------------------------
 def add_similarity_scores_for_all_users():
     profiles_cursor = profiles_col.find({}, {"saved_tenders": 1, "user_id": 1, "company_name": 1})
     profiles = list(profiles_cursor)
-    
     print(f"🟢 Found {len(profiles)} profiles.")
 
     for profile_idx, profile in enumerate(tqdm(profiles, desc="Processing profiles"), start=1):
@@ -67,7 +51,7 @@ def add_similarity_scores_for_all_users():
             except Exception as e:
                 print(f"⚠ Error converting user_id to ObjectId: {e}")
 
-        user_tender_max = {}  # tender_id -> max additional score
+        user_tender_max = {} 
 
         for idx, tid in enumerate(saved_ids, start=1):
             print(f"   🔹 Processing saved tender {idx}/{len(saved_ids)}: {tid}")
@@ -83,7 +67,7 @@ def add_similarity_scores_for_all_users():
             print(f"      Description preview: {tender.get('description', '')[:80]}...")
 
             try:
-                similar_tenders = vector_search_fast(query_vec, top_k=TOP_K)
+                similar_tenders = vector_search(query_vec, top_k=TOP_K)
             except Exception as e:
                 print(f"   ⚠ Error during vector search for tender {tid}: {e}")
                 continue
@@ -113,10 +97,7 @@ def add_similarity_scores_for_all_users():
                 print(f"   ⚠ Error during bulk write for user '{profile_name}': {e}")
         else:
             print(f"   ⚠ No similarity scores to apply for user '{profile_name}'")
-
-# ----------------------------- RUN -----------------------------
-if __name__ == "__main__":
-    start = time.time()
-    add_similarity_scores_for_all_users()
-    end = time.time()
+            
     print(f"\n🎉 All similarity scores applied for all profiles in {round(end - start, 2)} seconds.")
+
+rescore()
