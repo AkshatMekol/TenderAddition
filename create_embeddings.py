@@ -4,7 +4,7 @@ import pymongo
 from tqdm import tqdm
 from pymongo import MongoClient
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from config import BATCH_SIZE_EMBEDDINGS, OPENAI_API_KEY, WORKERS, MAX_RETRIES, MODEL, MONGO_URI, 
+from config import BATCH_SIZE_EMBEDDINGS, OPENAI_API_KEY, WORKERS, MAX_RETRIES, MODEL, MONGO_URI, DB_NAME, TENDERS_COLLECTION
 
 openai.api_key = OPENAI_API_KEY
 
@@ -43,7 +43,7 @@ def process_batch(col, batch_docs):
 
 def create_embeddings():
     client = MongoClient(MONGO_URI)
-    col = client[DB][COLL]
+    col = client[DB_NAME][TENDERS_COLLECTION]
 
     docs = list(col.find(
         {"embeddings": {"$exists": False}},
@@ -67,9 +67,3 @@ def create_embeddings():
             pass
 
     print("🎉 DONE - All embeddings generated!")
-
-
-# ----------------------------
-# RUN
-# ----------------------------
-run()
