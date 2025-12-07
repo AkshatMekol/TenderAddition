@@ -2,7 +2,6 @@ import time
 import openai
 import pymongo
 from tqdm import tqdm
-from pymongo import MongoClient
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from helpers import collection
 from config import MODEL, WORKERS, MAX_RETRIES, BATCH_SIZE_EMBEDDINGS, OPENAI_API_KEY
