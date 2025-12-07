@@ -13,10 +13,12 @@ S3_BUCKET = os.getenv("S3_BUCKET")
 S3_PREFIX = "tender-documents/"
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+VECTOR_INDEX_NAME = "tenders_vector_index"
 MODEL = "text-embedding-3-large"
 BATCH_SIZE_EMBEDDINGS = 512             
 MAX_RETRIES = 8
-WORKERS = 4               
+WORKERS = 4            
+TOP_K = 250
 
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
