@@ -1,23 +1,13 @@
 import time
 import openai
 import pymongo
-from pymongo import MongoClient
 from tqdm import tqdm
+from pymongo import MongoClient
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from config import BATCH_SIZE_EMBEDDINGS, OPENAI_API_KEY, WORKERS, MAX_RETRIES
+from config import BATCH_SIZE_EMBEDDINGS, OPENAI_API_KEY, WORKERS, MAX_RETRIES, MODEL, MONGO_URI, 
 
+openai.api_key = OPENAI_API_KEY
 
-# ----------------------------
-# CONFIG
-# ----------------------------
-
-
-
-
-
-# ----------------------------
-# OpenAI embedding with retry (no random)
-# ----------------------------
 def embed_batch(texts):
     for attempt in range(MAX_RETRIES):
         try:
@@ -35,10 +25,6 @@ def embed_batch(texts):
     print("❌ Max retries reached for batch")
     return None
 
-
-# ----------------------------
-# Process one batch
-# ----------------------------
 def process_batch(col, batch_docs):
     texts = [(d.get("description") or "") for d in batch_docs]
     ids = [d["_id"] for d in batch_docs]
@@ -55,12 +41,8 @@ def process_batch(col, batch_docs):
     col.bulk_write(ops)
     return len(ops)
 
-
-# ----------------------------
-# MAIN
-# ----------------------------
-def run():
-    client = MongoClient(MONGO_CONN_STRING)
+def create_embeddings():
+    client = MongoClient(MONGO_URI)
     col = client[DB][COLL]
 
     docs = list(col.find(
