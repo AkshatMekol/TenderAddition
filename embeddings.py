@@ -4,6 +4,7 @@ import pymongo
 from pymongo import MongoClient
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from config import BATCH_SIZE_EMBEDDINGS, OPENAI_API_KEY, WORKERS, MAX_RETRIES
 
 
 # ----------------------------
