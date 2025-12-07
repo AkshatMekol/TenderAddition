@@ -4,7 +4,8 @@ import pymongo
 from tqdm import tqdm
 from pymongo import MongoClient
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from config import BATCH_SIZE_EMBEDDINGS, OPENAI_API_KEY, WORKERS, MAX_RETRIES, MODEL, MONGO_URI, DB_NAME, TENDERS_COLLECTION
+from helpers import collection
+from config import MODEL, WORKERS, MAX_RETRIES, BATCH_SIZE_EMBEDDINGS, OPENAI_API_KEY
 
 openai.api_key = OPENAI_API_KEY
 
