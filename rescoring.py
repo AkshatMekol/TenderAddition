@@ -1,7 +1,7 @@
 import time
 from tqdm import tqdm
 from bson import ObjectId
-from pymongo import MongoClient, UpdateOne
+from pymongo import UpdateOne
 from config import VECTOR_INDEX_NAME, TOP_K
 from helpers import collection, profile_collection, score_collection
 
