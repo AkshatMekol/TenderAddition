@@ -96,10 +96,9 @@ def enrich_worker(tender):
     return None
 
 def process_locations():
-    # tenders = list(collection.find({"location": {"$exists": False}}))
     tenders = list(collection.find({
         "location": {"$exists": False},
-        "tender_value": {"$gt": 10000000}
+        "tender_url": {"$ne": "https://wbtenders.gov.in/nicgep/app"}
     }))
     print(f"Found {len(tenders)} tenders to enrich (without existing location).")
 
