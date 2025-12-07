@@ -99,5 +99,3 @@ def add_similarity_scores_for_all_users():
             print(f"   ⚠ No similarity scores to apply for user '{profile_name}'")
             
     print(f"\n🎉 All similarity scores applied for all profiles in {round(end - start, 2)} seconds.")
-
-rescore()
