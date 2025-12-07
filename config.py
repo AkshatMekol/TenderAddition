@@ -30,7 +30,7 @@ SCORE_COLLECTION = "CompatibilityScores"
 
 BATCH_SIZE = 5000
 NUM_WORKERS_DEEPSEEK = 50
-NUM_WORKERS_OLA = 20
+NUM_WORKERS_OLA = 2
 
 CENTRAL_URLS = [
     "https://eprocure.gov.in/eprocure/app",
