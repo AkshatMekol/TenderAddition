@@ -1,4 +1,5 @@
 import os
+import openai
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -10,6 +11,12 @@ AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.getenv("AWS_REGION")
 S3_BUCKET = os.getenv("S3_BUCKET")
 S3_PREFIX = "tender-documents/"
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+MODEL = "text-embedding-3-large"
+BATCH_SIZE_EMBEDDINGS = 512             
+MAX_RETRIES = 8
+WORKERS = 4               
 
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
