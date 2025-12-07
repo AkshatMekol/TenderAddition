@@ -25,12 +25,12 @@ def vector_search(query_vec, top_k=TOP_K):
     ]
 
     start = time.time()
-    results = list(tenders_col.aggregate(pipeline))
+    results = list(collection.aggregate(pipeline))
     print(f"⏱ Vector search: {time.time() - start:.2f}s — {len(results)} results")
     return results
     
 def add_similarity_scores_for_all_users():
-    profiles_cursor = profiles_col.find({}, {"saved_tenders": 1, "user_id": 1, "company_name": 1})
+    profiles_cursor = profile_collection.find({}, {"saved_tenders": 1, "user_id": 1, "company_name": 1})
     profiles = list(profiles_cursor)
     print(f"🟢 Found {len(profiles)} profiles.")
 
@@ -55,7 +55,7 @@ def add_similarity_scores_for_all_users():
 
         for idx, tid in enumerate(saved_ids, start=1):
             print(f"   🔹 Processing saved tender {idx}/{len(saved_ids)}: {tid}")
-            tender = tenders_col.find_one({"_id": ObjectId(tid)}, {"embeddings": 1, "description": 1})
+            tender = collection.find_one({"_id": ObjectId(tid)}, {"embeddings": 1, "description": 1})
             if not tender:
                 print(f"   ⚠ Tender ID {tid} not found. Skipping...")
                 continue
@@ -91,7 +91,7 @@ def add_similarity_scores_for_all_users():
                     )
                     for tid, score in user_tender_max.items()
                 ]
-                score_col.bulk_write(batch_ops, ordered=False)
+                score_collection.bulk_write(batch_ops, ordered=False)
                 print(f"   ✅ Scores applied successfully for user '{profile_name}'")
             except Exception as e:
                 print(f"   ⚠ Error during bulk write for user '{profile_name}': {e}")
