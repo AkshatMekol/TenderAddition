@@ -1,4 +1,3 @@
-from pymongo import MongoClient
 from bson import ObjectId
 from datetime import datetime, timezone, date
 from helpers import collection, profile_collection, score_collection, notification_collection
