@@ -52,11 +52,17 @@ def rescore():
             except Exception as e:
                 print(f"⚠ Error converting user_id to ObjectId: {e}")
 
-        user_tender_max = {} 
+        user_tender_max = {}
 
-        for idx, tid in enumerate(saved_ids, start=1):
+        for idx, item in enumerate(saved_ids, start=1):
+            tid = item.get("id")  # stringified tender ObjectId
             print(f"   🔹 Processing saved tender {idx}/{len(saved_ids)}: {tid}")
-            emb_doc = embedding_collection.find_one({"tender_id": str(tid)}, {"embedding": 1})
+
+            if not tid:
+                print("   ⚠ Invalid saved_tender entry, missing 'id'. Skipping...")
+                continue
+
+            emb_doc = embedding_col.find_one({"tender_id": tid}, {"embedding": 1})
             if not emb_doc or "embedding" not in emb_doc:
                 print(f"   ⚠ Tender ID {tid} has no embedding. Skipping...")
                 continue
@@ -64,7 +70,7 @@ def rescore():
             query_vec = emb_doc["embedding"]
 
             try:
-                similar_tenders = vector_search(query_vec, top_k=TOP_K)
+                similar_tenders = vector_search_fast(query_vec, top_k=TOP_K)
             except Exception as e:
                 print(f"   ⚠ Error during vector search for tender {tid}: {e}")
                 continue
@@ -72,8 +78,9 @@ def rescore():
             print(f"      Found {len(similar_tenders)} similar tenders.")
 
             for sim in similar_tenders:
-                tender_id = sim["_id"]
+                tender_id = sim["_id"]  # ObjectId
                 additional_score = round(sim["score"] * 10, 2)
+
                 if tender_id not in user_tender_max or additional_score > user_tender_max[tender_id]:
                     user_tender_max[tender_id] = additional_score
 
