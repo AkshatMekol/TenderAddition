@@ -84,7 +84,6 @@ def save_notifications(notifications):
     notification_collection.insert_many(notifications)
     print(f"✅ Saved {total} notifications!")
 
-
 def notify():
     print("\n🚀 Running notification engine for ALL users...\n")
     profiles = profile_collection.find({}, {"user_id": 1})
