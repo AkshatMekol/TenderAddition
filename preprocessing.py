@@ -95,9 +95,11 @@ def preprocessing():
         return
 
     if closed:
-        result = collection.delete_many({"unique_identifier": {"$in": closed}})
+        closed_docs = collection.find({"unique_identifier": {"$in": closed}}, {"_id": 1})
+        closed_ids = [str(d["_id"]) for d in closed_docs]
+        result = collection.delete_many({"_id": {"$in": [ObjectId(cid) for cid in closed_ids]}})
         print(f"🗑️ Deleted {result.deleted_count} closed tenders from Mongo.")
-        emb_result = embedding_collection.delete_many({"tender_id": {"$in": [str(uid) for uid in closed]}})
+        emb_result = embedding_collection.delete_many({"tender_id": {"$in": closed_ids}})
         print(f"🗑️ Deleted {emb_result.deleted_count} embeddings for closed tenders.")
     else:
         print("✅ No closed tenders to delete.")
