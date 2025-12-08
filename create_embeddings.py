@@ -2,9 +2,10 @@ import time
 import openai
 import pymongo
 from tqdm import tqdm
-from pymongo UpdateOne
+from bson import ObjectId
+from pymongo import UpdateOne
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from helpers import collection
+from helpers import collection, embedding_collection
 from config import MODEL, WORKERS, MAX_RETRIES, BATCH_SIZE_EMBEDDINGS, OPENAI_API_KEY
 
 openai.api_key = OPENAI_API_KEY
