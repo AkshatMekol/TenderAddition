@@ -1,8 +1,8 @@
-from helpers import collection, parse_date_naive
-from config import JSONL_FILE
 import json
 from tqdm import tqdm
 from dateutil import parser
+from config import JSONL_FILE
+from helpers import collection, embedding_collection parse_date_naive
 
 def get_latest_updated_at(collection):
     latest_doc = collection.find_one(
@@ -97,6 +97,8 @@ def preprocessing():
     if closed:
         result = collection.delete_many({"unique_identifier": {"$in": closed}})
         print(f"🗑️ Deleted {result.deleted_count} closed tenders from Mongo.")
+        emb_result = embedding_collection.delete_many({"tender_id": {"$in": [str(uid) for uid in closed]}})
+        print(f"🗑️ Deleted {emb_result.deleted_count} embeddings for closed tenders.")
     else:
         print("✅ No closed tenders to delete.")
 
