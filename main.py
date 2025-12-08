@@ -7,6 +7,8 @@ from process_coordinates import prepare_locations, process_coordinates
 from create_embeddings import create_embeddings
 from scoring import submit_for_scoring
 from rescoring import rescore
+from notifier import notify
+from postprocessing import postprocessing
 
 if __name__ == "__main__":
 
@@ -37,5 +39,11 @@ if __name__ == "__main__":
 
     print("\n\n\n==================== STEP 9: Recommendation Scoring for Saved ====================")
     rescore()
+
+    print("\n\n\n==================== STEP 10: Running the Notifier script ====================")
+    notify()
+
+    print("\n\n\n==================== STEP 11: Postprocessing Tenders for Dates ====================")
+    postprocessing()
 
     print("\n\n\n🎯 All steps completed successfully!")
