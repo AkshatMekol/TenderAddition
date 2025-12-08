@@ -24,6 +24,7 @@ from config import (
     COMPETITORS_COLLECTION,
     PROFILES_COLLECTION,
     SCORE_COLLECTION,
+    NOTIFICATIONS_COLLECTION,
     DEEPSEEK_API_URL,
     DEEPSEEK_API_KEY,
     OLA_API_KEY,
@@ -48,6 +49,7 @@ result_collection = db_past[RESULTS_COLLECTION]
 competitor_collection = db_past[COMPETITORS_COLLECTION]
 profile_collection = db[PROFILES_COLLECTION]
 score_collection = db[SCORE_COLLECTION]
+notification_collection = db[NOTIFICATIONS_COLLECTION]
 
 def parse_date_naive(date_str):
     if not date_str or str(date_str).strip() == "":
