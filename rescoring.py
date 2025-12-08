@@ -3,14 +3,14 @@ from tqdm import tqdm
 from bson import ObjectId
 from pymongo import UpdateOne
 from config import VECTOR_INDEX_NAME, TOP_K
-from helpers import collection, profile_collection, score_collection
+from helpers import profile_collection, score_collection, embedding_collection
 
 def vector_search(query_vec, top_k=TOP_K):
     pipeline = [
         {
             "$vectorSearch": {
                 "index": VECTOR_INDEX_NAME,
-                "path": "embeddings",
+                "path": "embedding",      
                 "queryVector": query_vec,
                 "numCandidates": top_k * 2,
                 "limit": top_k,
@@ -18,20 +18,21 @@ def vector_search(query_vec, top_k=TOP_K):
         },
         {
             "$project": {
-                "_id": 1,                     
+                "tender_id": 1,
                 "score": {"$meta": "vectorSearchScore"}
             }
         }
     ]
 
     start = time.time()
-    results = list(collection.aggregate(pipeline))
+    results = list(embedding_collection.aggregate(pipeline))
     print(f"⏱ Vector search: {time.time() - start:.2f}s — {len(results)} results")
     return results
-    
-def add_similarity_scores_for_all_users():
+
+def rescore():
     profiles_cursor = profile_collection.find({}, {"saved_tenders": 1, "user_id": 1, "company_name": 1})
     profiles = list(profiles_cursor)
+    
     print(f"🟢 Found {len(profiles)} profiles.")
 
     for profile_idx, profile in enumerate(tqdm(profiles, desc="Processing profiles"), start=1):
@@ -55,16 +56,12 @@ def add_similarity_scores_for_all_users():
 
         for idx, tid in enumerate(saved_ids, start=1):
             print(f"   🔹 Processing saved tender {idx}/{len(saved_ids)}: {tid}")
-            tender = collection.find_one({"_id": ObjectId(tid)}, {"embeddings": 1, "description": 1})
-            if not tender:
-                print(f"   ⚠ Tender ID {tid} not found. Skipping...")
-                continue
-            if "embeddings" not in tender:
-                print(f"   ⚠ Tender ID {tid} has no embeddings. Skipping...")
+            emb_doc = embedding_collection.find_one({"tender_id": str(tid)}, {"embedding": 1})
+            if not emb_doc or "embedding" not in emb_doc:
+                print(f"   ⚠ Tender ID {tid} has no embedding. Skipping...")
                 continue
 
-            query_vec = tender["embeddings"]
-            print(f"      Description preview: {tender.get('description', '')[:80]}...")
+            query_vec = emb_doc["embedding"]
 
             try:
                 similar_tenders = vector_search(query_vec, top_k=TOP_K)
@@ -86,7 +83,11 @@ def add_similarity_scores_for_all_users():
                 batch_ops = [
                     UpdateOne(
                         {"tender_id": tid, "user_id": user_id},
-                        {"$inc": {"score": score}},
+                        [
+                            {"$set": {
+                                "score": {"$min": [{"$add": ["$score", score]}, 100]}
+                            }}
+                        ],
                         upsert=True
                     )
                     for tid, score in user_tender_max.items()
@@ -97,5 +98,3 @@ def add_similarity_scores_for_all_users():
                 print(f"   ⚠ Error during bulk write for user '{profile_name}': {e}")
         else:
             print(f"   ⚠ No similarity scores to apply for user '{profile_name}'")
-            
-    print(f"\n🎉 All similarity scores applied for all profiles in {round(end - start, 2)} seconds.")
