@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-JSONL_FILE = "/home/ubuntu/TenderScraper/TenderData/Tenders/23_Nov_2025/tender.jsonl"
+JSONL_FILE = "/home/ubuntu/BidScraper/TenderData/Tenders/08_Dec_2025/tender.jsonl"
 
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
