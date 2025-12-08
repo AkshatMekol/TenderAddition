@@ -17,6 +17,7 @@ from config import (
     DB_NAME,
     DB_NAME_PAST,
     TENDERS_COLLECTION,
+    EMBEDDINGS_COLLECTION,
     DOCS_STATUS_COLLECTION,
     VECTOR_COLLECTION,
     RESULTS_COLLECTION,
@@ -40,6 +41,7 @@ client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
 db = client[DB_NAME]
 db_past = client[DB_NAME_PAST]
 collection = db[TENDERS_COLLECTION]
+embedding_collection = db[EMBEDDINGS_COLLECTION]
 status_collection = db[DOCS_STATUS_COLLECTION]
 vector_collection = db[VECTOR_COLLECTION]
 result_collection = db_past[RESULTS_COLLECTION]
