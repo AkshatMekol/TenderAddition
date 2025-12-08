@@ -1,8 +1,9 @@
 import json
 from tqdm import tqdm
+from bson import ObjectId
 from dateutil import parser
 from config import JSONL_FILE
-from helpers import collection, embedding_collection parse_date_naive
+from helpers import collection, embedding_collection, parse_date_naive
 
 def get_latest_updated_at(collection):
     latest_doc = collection.find_one(
