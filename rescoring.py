@@ -62,7 +62,7 @@ def rescore():
                 print("   ⚠ Invalid saved_tender entry, missing 'id'. Skipping...")
                 continue
 
-            emb_doc = embedding_col.find_one({"tender_id": tid}, {"embedding": 1})
+            emb_doc = embedding_collection.find_one({"tender_id": tid}, {"embedding": 1})
             if not emb_doc or "embedding" not in emb_doc:
                 print(f"   ⚠ Tender ID {tid} has no embedding. Skipping...")
                 continue
@@ -70,7 +70,7 @@ def rescore():
             query_vec = emb_doc["embedding"]
 
             try:
-                similar_tenders = vector_search_fast(query_vec, top_k=TOP_K)
+                similar_tenders = vector_search(query_vec, top_k=TOP_K)
             except Exception as e:
                 print(f"   ⚠ Error during vector search for tender {tid}: {e}")
                 continue
