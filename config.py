@@ -41,7 +41,7 @@ NOTIFICATIONS_COLLECTION = "Notification"
 
 BATCH_SIZE = 5000
 NUM_WORKERS_DEEPSEEK = 50
-NUM_WORKERS_OLA = 2
+NUM_WORKERS_OLA = 1
 
 CENTRAL_URLS = [
     "https://eprocure.gov.in/eprocure/app",
