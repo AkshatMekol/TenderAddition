@@ -101,6 +101,8 @@ def score_big_tender(company_info, tender_info, participation_score):
         if not tender_coords:
             return 15
         sites = company_info.get("hq_locations", []) + company_info.get("regional_offices", []) + company_info.get("ongoing_sites", [])
+        if not sites:
+            return 25
         max_weighted_score = 0
         for site in sites:
             coords = site.get("coordinates")
@@ -137,6 +139,8 @@ def score_small_tender(company_info, tender_info, participation_score):
         if not tender_coords:
             return 0
         sites = company_info.get("hq_locations", []) + company_info.get("regional_offices", []) + company_info.get("ongoing_sites", [])
+        if not sites:
+            return 55
         max_weighted_score = 0
         for site in sites:
             coords = site.get("coordinates")
@@ -144,7 +148,7 @@ def score_small_tender(company_info, tender_info, participation_score):
             if not coords:
                 continue
             dist_km = haversine(tender_coords, coords)
-            if dist_km <= 55:
+            if dist_km <= 50:
                 score = 55 - ((dist_km / 50) * 10)
             elif dist_km <= 200:
                 score = 45 - ((dist_km - 50) / 150 * (45 - 10))
