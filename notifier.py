@@ -4,28 +4,55 @@ from helpers import collection, profile_collection, score_collection, notificati
 
 TODAY_STR = date.today().isoformat()
 
-def get_high_compatibility_tenders(user_id, score_threshold=60):
-    scores = list(score_collection.find({"user_id": user_id, "score": {"$gte": score_threshold}}))
-    print(f"✅ Scores above threshold ({score_threshold}): {len(scores)}")
-    if not scores:
+def get_high_compatibility_tenders(user_id):
+    user = profile_collection.find_one({"user_id": user_id}, {"midpoint": 1})
+    midpoint = user.get("midpoint", 500000000) if user else 500000000
+
+    scores_cursor = score_collection.find({"user_id": user_id})
+    scores_list = list(scores_cursor)
+    if not scores_list:
+        print(f"⚠️ No compatibility scores found for user {user_id}")
         return []
 
-    tender_ids = [s["tender_id"] for s in scores]
+    tender_ids = [s["tender_id"] for s in scores_list]
     tenders_cursor = collection.find({"_id": {"$in": tender_ids}})
     tenders_map = {t["_id"]: t for t in tenders_cursor}
 
-    today_tenders = []
-    for s in scores:
-        t = tenders_map.get(s["tender_id"])
-        if not t:
-            print(f"⚠️ Tender not found: {s['tender_id']}")
-            continue
-        if t.get("published_date") and str(t["published_date"])[:10] == TODAY_STR:
-            today_tenders.append(("new_tender", t))
-            print(f"📌 New tender today: {t['_id']} | Score={s['score']}")
+    low_value_scores = []
+    high_value_scores = []
 
-    print(f"🎯 Total high compatibility tenders today: {len(today_tenders)}")
-    return today_tenders
+    for s in scores_list:
+        tender_id = s["tender_id"]
+        score = s.get("score", 0)
+        tender = tenders_map.get(tender_id)
+        if not tender:
+            continue
+        tender_value = tender.get("tender_value", 0)
+        if tender_value < midpoint:
+            low_value_scores.append((score, tender))
+        else:
+            high_value_scores.append((score, tender))
+
+    low_value_scores.sort(key=lambda x: x[0], reverse=True)
+    high_value_scores.sort(key=lambda x: x[0], reverse=True)
+
+    low_threshold = low_value_scores[49][0] if len(low_value_scores) >= 50 else (low_value_scores[-1][0] if low_value_scores else 0)
+    high_threshold = high_value_scores[9][0] if len(high_value_scores) >= 10 else (high_value_scores[-1][0] if high_value_scores else 0)
+
+    print(f"User={user_id} | Low-value threshold (50th) = {low_threshold} | High-value threshold (10th) = {high_threshold}")
+
+    top_low = low_value_scores[:50]
+    top_high = high_value_scores[:10]
+
+    notifications = []
+    for score, tender in top_low + top_high:
+        published = tender.get("published_date")
+        if published and str(published)[:10] == TODAY_STR:
+            notifications.append(("new_tender", tender))
+            print(f"📌 Notify: Tender={tender['_id']} | Score={score} | Value={tender.get('tender_value')}")
+
+    print(f"🎯 Total tenders to notify today: {len(notifications)}")
+    return notifications
 
 def get_changed_saved_tenders(user_id):
     user = profile_collection.find_one({"user_id": user_id})
