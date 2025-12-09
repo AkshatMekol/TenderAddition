@@ -70,7 +70,7 @@ def create_embeddings():
 
     print(f"🔵 Need embeddings for {total} docs")
 
-    batches = [docs[i:i + BATCH_SIZE] for i in range(0, total, BATCH_SIZE)]
+    batches = [docs[i:i + BATCH_SIZE_EMBEDDINGS] for i in range(0, total, BATCH_SIZE_EMBEDDINGS)]
 
     pbar = tqdm(total=total, desc="Embedding")
 
