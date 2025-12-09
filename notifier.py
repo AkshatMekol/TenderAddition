@@ -5,56 +5,46 @@ from helpers import collection, profile_collection, score_collection, notificati
 TODAY_STR = date.today().isoformat()
 
 def get_high_compatibility_tenders(user_id, score_threshold=60):
-    print(f"🔹 Fetching CompatibilityScores for user_id={user_id}")
-    scores_cursor = score_collection.find({"user_id": user_id})
-    
-    scores_list = list(scores_cursor)
-    print(f"📝 Total compatibility scores found: {len(scores_list)}")
+    scores = list(score_collection.find({"user_id": user_id, "score": {"$gte": score_threshold}}))
+    print(f"✅ Scores above threshold ({score_threshold}): {len(scores)}")
+    if not scores:
+        return []
 
-    above_threshold = [s for s in scores_list if s.get("score", 0) >= score_threshold]
-    print(f"✅ Scores above threshold ({score_threshold}): {len(above_threshold)}")
+    tender_ids = [s["tender_id"] for s in scores]
+    tenders_cursor = collection.find({"_id": {"$in": tender_ids}})
+    tenders_map = {t["_id"]: t for t in tenders_cursor}
 
-    if above_threshold:
-        max_score = max(s.get("score", 0) for s in above_threshold)
-        print(f"🏆 Highest score today: {max_score}")
-
-    tenders = []
-    today_count = 0
-    for s in above_threshold:
-        tender = collection.find_one({"_id": s["tender_id"]})
-        if not tender:
-            print(f"⚠️ Tender not found for tender_id={s['tender_id']}")
+    today_tenders = []
+    for s in scores:
+        t = tenders_map.get(s["tender_id"])
+        if not t:
+            print(f"⚠️ Tender not found: {s['tender_id']}")
             continue
+        if t.get("published_date") and str(t["published_date"])[:10] == TODAY_STR:
+            today_tenders.append(("new_tender", t))
+            print(f"📌 New tender today: {t['_id']} | Score={s['score']}")
 
-        published = tender.get("published_date")
-        if published and str(published)[:10] == TODAY_STR:
-            tenders.append(("new_tender", tender))
-            today_count += 1
-            print(f"📌 New tender today: {tender['_id']} | Score={s.get('score')}")
-
-    print(f"🎯 Total high compatibility tenders published today: {today_count}")
-    return tenders
+    print(f"🎯 Total high compatibility tenders today: {len(today_tenders)}")
+    return today_tenders
 
 def get_changed_saved_tenders(user_id):
     user = profile_collection.find_one({"user_id": user_id})
     saved = user.get("saved_tenders", []) if user else []
-    print(f"🔹 Total saved tenders for user: {len(saved)}")
+    print(f"🔹 Total saved tenders: {len(saved)}")
 
+    tender_ids = [ObjectId(item["id"]) for item in saved if item.get("id")]
+    if not tender_ids:
+        return []
+
+    tenders_cursor = collection.find({"_id": {"$in": tender_ids}})
     changed_list = []
-    changed_count = 0
-    for item in saved:
-        tid = item.get("id")
-        if not tid:
-            continue
-        tender = collection.find_one({"_id": ObjectId(tid)})
 
-        corrigendum = tender.get("corrigendum_date")
-        if corrigendum and str(corrigendum)[:10] == TODAY_STR:
-            changed_list.append(tender)
-            changed_count += 1
-            print(f"📌 Saved tender updated today: {tender['_id']}")
+    for t in tenders_cursor:
+        if t.get("corrigendum_date") and str(t["corrigendum_date"])[:10] == TODAY_STR:
+            changed_list.append(t)
+            print(f"📌 Saved tender updated today: {t['_id']}")
 
-    print(f"🎯 Total saved tenders changed today: {changed_count}")
+    print(f"🎯 Total saved tenders changed today: {len(changed_list)}")
     return changed_list
 
 def build_notification(user_id, tender, ntype):
