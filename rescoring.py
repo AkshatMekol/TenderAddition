@@ -78,7 +78,7 @@ def rescore():
             print(f"      Found {len(similar_tenders)} similar tenders.")
 
             for sim in similar_tenders:
-                tender_id = sim["_id"]  # ObjectId
+                tender_id = ObjectId(sim["tender_id"])  
                 additional_score = round(sim["score"] * 10, 2)
 
                 if tender_id not in user_tender_max or additional_score > user_tender_max[tender_id]:
@@ -92,7 +92,12 @@ def rescore():
                         {"tender_id": tid, "user_id": user_id},
                         [
                             {"$set": {
-                                "score": {"$min": [{"$add": ["$score", score]}, 100]}
+                                "score": {
+                                    "$round": [
+                                        {"$min": [{"$add": [{"$ifNull": ["$score", 0]}, score]}, 100]},
+                                        2
+                                    ]
+                                }
                             }}
                         ],
                         upsert=True
