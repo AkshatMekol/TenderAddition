@@ -98,11 +98,11 @@ def score_big_tender(company_info, tender_info, participation_score):
 
     def proximity():
         tender_coords = tender_info.get("coordinates")
-        if not tender_coords:
-            return 15
         sites = company_info.get("hq_locations", []) + company_info.get("regional_offices", []) + company_info.get("ongoing_sites", [])
         if not sites:
             return 25
+        if not tender_coords:
+            return 15
         max_weighted_score = 0
         for site in sites:
             coords = site.get("coordinates")
@@ -136,11 +136,11 @@ def score_small_tender(company_info, tender_info, participation_score):
 
     def proximity():
         tender_coords = tender_info.get("coordinates")
-        if not tender_coords:
-            return 0
         sites = company_info.get("hq_locations", []) + company_info.get("regional_offices", []) + company_info.get("ongoing_sites", [])
         if not sites:
             return 55
+        if not tender_coords:
+            return 35
         max_weighted_score = 0
         for site in sites:
             coords = site.get("coordinates")
@@ -221,6 +221,13 @@ def submit_for_scoring():
 
             if tender["_id"] in matching_tender_ids:
                 score = min(score + 10, 100)
+
+            category_pref = company_info.get("category_preference")
+                tender_category = tender.get("category")
+
+            if category_pref and tender_category:
+                if tender_category.strip().lower() == category_pref.strip().lower():
+                    score = min(score + 10, 100)
 
             user_id = profile["user_id"]
             if isinstance(user_id, str):
