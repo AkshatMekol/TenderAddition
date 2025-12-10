@@ -223,10 +223,10 @@ def submit_for_scoring():
                 score = min(score + 10, 100)
 
             category_pref = company_info.get("category_preference")
-                tender_category = tender.get("category")
+            tender_category = tender.get("category")
 
             if category_pref and tender_category:
-                if tender_category.strip().lower() == category_pref.strip().lower():
+                if tender_category == category_pref:
                     score = min(score + 10, 100)
 
             user_id = profile["user_id"]
